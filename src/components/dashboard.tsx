@@ -9,6 +9,7 @@ type Row = {
   name: string;
   roaster: string;
   country: string | null;
+  mix: string | null;
   process: string | null;
   roastLevel: string | null;
   roastDate: string | null;
@@ -190,6 +191,17 @@ export default function Dashboard({ rows }: { rows: Row[] }) {
       .filter((s) => s.value > 0);
   }, [filtered]);
 
+  const mixSegments = useMemo(() => {
+    const out: Segment[] = [];
+    const blend = filtered.filter((r) => r.mix === "blend");
+    const single = filtered.filter((r) => r.mix === "single-origin");
+    const unset = filtered.filter((r) => !r.mix);
+    if (blend.length > 0) out.push({ label: "Blend", value: blend.length, rows: blend });
+    if (single.length > 0) out.push({ label: "Single origin", value: single.length, rows: single });
+    if (unset.length > 0) out.push({ label: "Not set", value: unset.length, rows: unset });
+    return out;
+  }, [filtered]);
+
   const decafRows = useMemo(() => filtered.filter((r) => r.decaffeinated), [filtered]);
   const regularRows = useMemo(() => filtered.filter((r) => !r.decaffeinated), [filtered]);
 
@@ -271,6 +283,10 @@ export default function Dashboard({ rows }: { rows: Row[] }) {
 
         <Card title="Process" subtitle="Processing methods">
           <HBars data={processSegments} onSelect={selectSegment} max={Math.max(1, ...processSegments.map((x) => x.value))} />
+        </Card>
+
+        <Card title="Blend vs single origin">
+          <HBars data={mixSegments} onSelect={selectSegment} max={Math.max(1, ...mixSegments.map((x) => x.value))} />
         </Card>
 
         <Card title="Ratings">

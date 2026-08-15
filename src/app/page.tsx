@@ -13,6 +13,7 @@ export default async function HomePage() {
       name: coffees.name,
       roaster: coffees.roaster,
       country: coffees.country,
+      mix: coffees.mix,
       process: coffees.process,
       roastLevel: coffees.roastLevel,
       roastDate: coffees.roastDate,
