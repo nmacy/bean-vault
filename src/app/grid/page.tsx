@@ -22,6 +22,7 @@ export default async function GridPage() {
       priceCents: coffees.priceCents,
       weightGrams: coffees.weightGrams,
       rating: coffees.rating,
+      decaffeinated: coffees.decaffeinated,
       photoFile: coffees.photoFile,
     })
     .from(coffees)

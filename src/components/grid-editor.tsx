@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { saveGrid, findCoffeePhoto, type GridRow } from "@/app/actions";
 
@@ -26,19 +26,40 @@ const ROAST_LEVELS = ["light", "medium-light", "medium", "medium-dark", "dark"];
 const ROAST_ORDER = new Map(ROAST_LEVELS.map((l, i) => [l, i]));
 
 const TEXT_FIELDS: (keyof Cell)[] = ["roaster", "name", "origin", "variety", "process"];
-const SORT_KEYS = {
-  Roaster: "roaster",
-  Name: "name",
-  Origin: "origin",
-  Variety: "variety",
-  Process: "process",
-  Roast: "roastLevel",
-  "Roast date": "roastDate",
-  Purchased: "purchaseDate",
-  Price: "price",
-  "Weight (g)": "weight",
-  Rating: "rating",
-} as const;
+
+const COLUMNS: { key: string; label: string }[] = [
+  { key: "roaster", label: "Roaster" },
+  { key: "name", label: "Name" },
+  { key: "origin", label: "Origin" },
+  { key: "variety", label: "Variety" },
+  { key: "process", label: "Process" },
+  { key: "roastLevel", label: "Roast" },
+  { key: "roastDate", label: "Roast date" },
+  { key: "purchaseDate", label: "Purchased" },
+  { key: "price", label: "Price" },
+  { key: "weight", label: "Weight (g)" },
+  { key: "rating", label: "Rating" },
+  { key: "decaf", label: "Decaf" },
+];
+const COLUMN_KEYS = COLUMNS.map((c) => c.key);
+const COLUMNS_STORAGE_KEY = "bean-vault:grid-columns";
+
+function readStoredColumns(): string[] {
+  if (typeof window === "undefined") return COLUMN_KEYS;
+  try {
+    const raw = window.localStorage.getItem(COLUMNS_STORAGE_KEY);
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const keys = parsed.filter((k): k is string => typeof k === "string" && COLUMN_KEYS.includes(k));
+        if (keys.length > 0) return keys;
+      }
+    }
+  } catch {
+    /* corrupt storage — fall back to defaults */
+  }
+  return COLUMN_KEYS;
+}
 
 function toCell(row: GridRow): Cell {
   return {
@@ -72,6 +93,7 @@ function toPayload(row: BaseRow, cell: Cell): GridRow {
     priceCents: price !== null && Number.isFinite(price) ? price : null,
     weightGrams: weight !== null && Number.isFinite(weight) && weight > 0 ? weight : null,
     rating: cell.rating ? Number(cell.rating) : null,
+    decaffeinated: row.decaffeinated,
   };
 }
 
@@ -119,7 +141,8 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
   const [statuses, setStatuses] = useState<Record<number, Status>>({});
   const [cellErrors, setCellErrors] = useState<Record<number, { roaster?: boolean; name?: boolean }>>({});
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
-  const [filters, setFilters] = useState({ search: "", roaster: "", roast: "", rating: "", year: "" });
+  const [filters, setFilters] = useState({ search: "", roaster: "", roast: "", rating: "", year: "", decaf: "" });
+  const [visibleCols, setVisibleCols] = useState<string[]>(readStoredColumns);
 
   const rowsRef = useRef(rows);
   const draftsRef = useRef(drafts);
@@ -134,6 +157,14 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
   const findingRef = useRef(new Set<number>());
   const [batchMsg, setBatchMsg] = useState<string | null>(null);
   const savedTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(visibleCols));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [visibleCols]);
 
   function setCell(id: number, field: keyof Cell, value: string) {
     draftsRef.current = { ...draftsRef.current, [id]: { ...draftsRef.current[id], [field]: value } };
@@ -246,6 +277,26 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
     return drafts[id]?.[field] ?? entry.cell[field];
   }
 
+  /* ---------- decaf toggle (checkboxes commit immediately) ---------- */
+
+  async function toggleDecaf(id: number) {
+    const entry = rowsRef.current.find((r) => r.row.id === id);
+    if (!entry) return;
+    const next = !entry.row.decaffeinated;
+    const payload = { ...toPayload(entry.row, entry.cell), decaffeinated: next };
+
+    // optimistic
+    rowsRef.current = rowsRef.current.map((en) => (en.row.id === id ? { ...en, row: { ...en.row, decaffeinated: next } } : en));
+    setRows(rowsRef.current);
+
+    const res = await saveGrid([payload]);
+    if (res.saved !== 1) {
+      rowsRef.current = rowsRef.current.map((en) => (en.row.id === id ? { ...en, row: { ...en.row, decaffeinated: !next } } : en));
+      setRows(rowsRef.current);
+      setStatus(id, { kind: "error", msg: "Could not save." });
+    }
+  }
+
   /* ---------- photo lookup ---------- */
 
   async function tryFindPhoto(id: number) {
@@ -276,11 +327,11 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
       const after = rowsRef.current.find((r) => r.row.id === id)?.row.photoFile;
       if (before !== after) found += 1;
       if (i % 5 === 0 || i === missing.length - 1) {
-        setBatchMsg(`Finding… (${i + 1}/${missing.length}, ${found} found)`);
+        setBatch(`Finding… (${i + 1}/${missing.length}, ${found} found)`);
       }
     }
-    setBatchMsg(`Done: found ${found} of ${missing.length}.`);
-    setTimeout(() => setBatchMsg(null), 6000);
+    setBatch(`Done: found ${found} of ${missing.length}.`);
+    setTimeout(() => setBatch(null), 6000);
   }
 
   /* ---------- unsaved-changes guard (focused cell) ---------- */
@@ -295,23 +346,23 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
 
   /* ---------- filter + sort ---------- */
 
-  const roasters = useMemo(
-    () => [...new Set(rows.map((r) => r.row.roaster))].sort((a, b) => a.localeCompare(b)),
-    [rows],
-  );
-
-  const batchCount = useMemo(() => rows.filter((r) => !r.row.photoFile).length, [rows]);
-
   /** Bag year: roast date primarily (the vintage), purchase date as fallback. */
   function yearOf(cell: Cell): string | null {
     return cell.roastDate.slice(0, 4) || cell.purchaseDate.slice(0, 4) || null;
   }
+
+  const roasters = useMemo(
+    () => [...new Set(rows.map((r) => r.row.roaster))].sort((a, b) => a.localeCompare(b)),
+    [rows],
+  );
 
   const years = useMemo(
     () =>
       [...new Set(rows.map(({ cell }) => yearOf(cell)).filter((y): y is string => y !== null))].sort().reverse(),
     [rows],
   );
+
+  const batchCount = useMemo(() => rows.filter((r) => !r.row.photoFile).length, [rows]);
 
   const visible = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
@@ -331,6 +382,8 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
         const y = yearOf(cell);
         if (filters.year === "__none__" ? y !== null : y !== filters.year) return false;
       }
+      if (filters.decaf === "yes" && !row.decaffeinated) return false;
+      if (filters.decaf === "no" && row.decaffeinated) return false;
       return true;
     });
     if (sort) {
@@ -350,6 +403,9 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
         } else if (key === "roastLevel") {
           va = va ? ROAST_ORDER.get(va as string) : null;
           vb = vb ? ROAST_ORDER.get(vb as string) : null;
+        } else if (key === "decaf") {
+          va = a.row.decaffeinated ? 1 : 0;
+          vb = b.row.decaffeinated ? 1 : 0;
         }
         const na = va == null || va === "";
         const nb = vb == null || vb === "";
@@ -372,10 +428,101 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
   }
 
   function resetFilters() {
-    setFilters({ search: "", roaster: "", roast: "", rating: "", year: "" });
+    setFilters({ search: "", roaster: "", roast: "", rating: "", year: "", decaf: "" });
   }
 
-  return (
+  function toggleColumn(key: string) {
+    setVisibleCols((cols) => (cols.includes(key) ? cols.filter((c) => c !== key) : [...cols, key]));
+  }
+
+  function setBatch(msg: string | null) {
+    setBatchMsg(msg);
+  }
+
+  /* ---------- cell rendering ---------- */
+
+  function renderCell(row: BaseRow, key: string) {
+    const status = statuses[row.id];
+    switch (key) {
+      case "roaster":
+        return (
+          <td>
+            <input
+              value={cellValue(row.id, "roaster")}
+              className={cellErrors[row.id]?.roaster ? "cell-error" : undefined}
+              onChange={(e) => setCell(row.id, "roaster", e.target.value)}
+              onBlur={() => handleBlur(row.id, "roaster")}
+            />
+          </td>
+        );
+      case "name":
+        return (
+          <td>
+            <input
+              value={cellValue(row.id, "name")}
+              className={cellErrors[row.id]?.name ? "cell-error" : undefined}
+              onChange={(e) => setCell(row.id, "name", e.target.value)}
+              onBlur={() => handleBlur(row.id, "name")}
+            />
+          </td>
+        );
+      case "origin":
+        return <td><input value={cellValue(row.id, "origin")} onChange={(e) => setCell(row.id, "origin", e.target.value)} onBlur={() => handleBlur(row.id, "origin")} /></td>;
+      case "variety":
+        return <td><input value={cellValue(row.id, "variety")} onChange={(e) => setCell(row.id, "variety", e.target.value)} onBlur={() => handleBlur(row.id, "variety")} /></td>;
+      case "process":
+        return <td><input value={cellValue(row.id, "process")} onChange={(e) => setCell(row.id, "process", e.target.value)} onBlur={() => handleBlur(row.id, "process")} /></td>;
+      case "roastLevel":
+        return (
+          <td>
+            <select value={cellValue(row.id, "roastLevel")} onChange={(e) => setCell(row.id, "roastLevel", e.target.value)} onBlur={() => handleBlur(row.id, "roastLevel")}>
+              <option value="">—</option>
+              {ROAST_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </td>
+        );
+      case "roastDate":
+        return <td><input type="date" value={cellValue(row.id, "roastDate")} onChange={(e) => setCell(row.id, "roastDate", e.target.value)} onBlur={() => handleBlur(row.id, "roastDate")} /></td>;
+      case "purchaseDate":
+        return <td><input type="date" value={cellValue(row.id, "purchaseDate")} onChange={(e) => setCell(row.id, "purchaseDate", e.target.value)} onBlur={() => handleBlur(row.id, "purchaseDate")} /></td>;
+      case "price":
+        return (
+          <td className="num">
+            <input inputMode="decimal" value={cellValue(row.id, "price")} placeholder="—" onChange={(e) => setCell(row.id, "price", sanitizePrice(e.target.value))} onBlur={() => handleBlur(row.id, "price")} />
+          </td>
+        );
+      case "weight":
+        return (
+          <td className="num">
+            <input inputMode="numeric" value={cellValue(row.id, "weight")} placeholder="—" onChange={(e) => setCell(row.id, "weight", sanitizeWeight(e.target.value))} onBlur={() => handleBlur(row.id, "weight")} />
+          </td>
+        );
+      case "rating":
+        return (
+          <td>
+            <select value={cellValue(row.id, "rating")} onChange={(e) => setCell(row.id, "rating", e.target.value)} onBlur={() => handleBlur(row.id, "rating")}>
+              <option value="">—</option>
+              {[1, 2, 3, 4, 5].map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </td>
+        );
+      case "decaf":
+        return (
+          <td className="col-decaf">
+            <input
+              type="checkbox"
+              checked={row.decaffeinated}
+              onChange={() => void toggleDecaf(row.id)}
+              aria-label="Decaffeinated"
+            />
+          </td>
+        );
+      default:
+        return null;
+    }
+  }
+
+return (
     <>
       <div className="grid-toolbar">
         <input
@@ -403,13 +550,33 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
           {[1, 2, 3, 4, 5].map((r) => <option key={r} value={r}>{r}★</option>)}
           <option value="none">Unrated</option>
         </select>
-        {(filters.search || filters.roaster || filters.roast || filters.rating || filters.year) ? (
+        <select className="filter-select" value={filters.decaf} onChange={(e) => setFilters((f) => ({ ...f, decaf: e.target.value }))}>
+          <option value="">Any decaf</option>
+          <option value="yes">Decaf only</option>
+          <option value="no">Not decaf</option>
+        </select>
+        {(filters.search || filters.roaster || filters.roast || filters.rating || filters.year || filters.decaf) ? (
           <button type="button" className="btn secondary btn-small" onClick={resetFilters}>Reset</button>
         ) : null}
         <span className="filter-count">{visible.length} of {rows.length}</span>
         {batchMsg ? <span className="grid-saved">{batchMsg}</span> : null}
         <span className="grid-hint">Edits save automatically when you leave a cell.</span>
         <span className="toolbar-spacer" />
+        <details className="columns-menu">
+          <summary className="btn btn-small btn-secondary columns-toggle">Columns</summary>
+          <div className="columns-panel">
+            {COLUMNS.map((c) => (
+              <label key={c.key} className="column-option">
+                <input
+                  type="checkbox"
+                  checked={visibleCols.includes(c.key)}
+                  onChange={() => toggleColumn(c.key)}
+                />
+                {c.label}
+              </label>
+            ))}
+          </div>
+        </details>
         <button
           type="button"
           className="btn btn-small"
@@ -425,15 +592,15 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
           <thead>
             <tr>
               <th className="col-photo">Photo</th>
-              {Object.entries(SORT_KEYS).map(([label, key]) => (
-                <th key={key} className={key === "price" || key === "weight" ? "num" : undefined}>
+              {COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) => (
+                <th key={c.key} className={c.key === "price" || c.key === "weight" ? "num" : c.key === "decaf" ? "col-decaf" : undefined}>
                   <button
                     type="button"
-                    className={`th-sort${sort?.key === key ? " active" : ""}`}
-                    onClick={() => cycleSort(key)}
+                    className={`th-sort${sort?.key === c.key ? " active" : ""}`}
+                    onClick={() => cycleSort(c.key)}
                   >
-                    {label}
-                    {sort?.key === key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
+                    {c.label}
+                    {sort?.key === c.key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
                   </button>
                 </th>
               ))}
@@ -443,7 +610,7 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={13} className="grid-empty">No coffees match the filters.</td>
+                <td colSpan={2 + visibleCols.length} className="grid-empty">No coffees match the filters.</td>
               </tr>
             ) : null}
             {visible.map(({ row }) => {
@@ -466,45 +633,9 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
                       </button>
                     )}
                   </td>
-                  <td>
-                    <input
-                      value={cellValue(row.id, "roaster")}
-                      className={cellErrors[row.id]?.roaster ? "cell-error" : undefined}
-                      onChange={(e) => setCell(row.id, "roaster", e.target.value)}
-                      onBlur={() => handleBlur(row.id, "roaster")}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={cellValue(row.id, "name")}
-                      className={cellErrors[row.id]?.name ? "cell-error" : undefined}
-                      onChange={(e) => setCell(row.id, "name", e.target.value)}
-                      onBlur={() => handleBlur(row.id, "name")}
-                    />
-                  </td>
-                  <td><input value={cellValue(row.id, "origin")} onChange={(e) => setCell(row.id, "origin", e.target.value)} onBlur={() => handleBlur(row.id, "origin")} /></td>
-                  <td><input value={cellValue(row.id, "variety")} onChange={(e) => setCell(row.id, "variety", e.target.value)} onBlur={() => handleBlur(row.id, "variety")} /></td>
-                  <td><input value={cellValue(row.id, "process")} onChange={(e) => setCell(row.id, "process", e.target.value)} onBlur={() => handleBlur(row.id, "process")} /></td>
-                  <td>
-                    <select value={cellValue(row.id, "roastLevel")} onChange={(e) => setCell(row.id, "roastLevel", e.target.value)} onBlur={() => handleBlur(row.id, "roastLevel")}>
-                      <option value="">—</option>
-                      {ROAST_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
-                    </select>
-                  </td>
-                  <td><input type="date" value={cellValue(row.id, "roastDate")} onChange={(e) => setCell(row.id, "roastDate", e.target.value)} onBlur={() => handleBlur(row.id, "roastDate")} /></td>
-                  <td><input type="date" value={cellValue(row.id, "purchaseDate")} onChange={(e) => setCell(row.id, "purchaseDate", e.target.value)} onBlur={() => handleBlur(row.id, "purchaseDate")} /></td>
-                  <td className="num">
-                    <input inputMode="decimal" value={cellValue(row.id, "price")} placeholder="—" onChange={(e) => setCell(row.id, "price", sanitizePrice(e.target.value))} onBlur={() => handleBlur(row.id, "price")} />
-                  </td>
-                  <td className="num">
-                    <input inputMode="numeric" value={cellValue(row.id, "weight")} placeholder="—" onChange={(e) => setCell(row.id, "weight", sanitizeWeight(e.target.value))} onBlur={() => handleBlur(row.id, "weight")} />
-                  </td>
-                  <td>
-                    <select value={cellValue(row.id, "rating")} onChange={(e) => setCell(row.id, "rating", e.target.value)} onBlur={() => handleBlur(row.id, "rating")}>
-                      <option value="">—</option>
-                      {[1, 2, 3, 4, 5].map((r) => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </td>
+                  {COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) => (
+                    <Fragment key={c.key}>{renderCell(row, c.key)}</Fragment>
+                  ))}
                   <td className="col-status">
                     {status ? (
                       <span className={`status-chip ${status.kind}`}>

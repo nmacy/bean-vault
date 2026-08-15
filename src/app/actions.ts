@@ -32,6 +32,7 @@ export type GridRow = {
   priceCents: number | null;
   weightGrams: number | null;
   rating: number | null;
+  decaffeinated: boolean;
 };
 
 export type SaveGridResult = { saved: number; skipped?: number };
@@ -62,6 +63,7 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
           priceCents: row.priceCents,
           weightGrams: row.weightGrams,
           rating: row.rating,
+          decaffeinated: row.decaffeinated,
           updatedAt: new Date(),
         })
         .where(eq(coffees.id, row.id))
