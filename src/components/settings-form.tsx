@@ -1,25 +1,31 @@
 "use client";
 
 import { useActionState } from "react";
-import { saveApiKey } from "@/app/actions";
+import { saveAiModel, saveApiKey } from "@/app/actions";
 
 export default function SettingsForm({
   configured,
   source,
+  modelSource,
+  currentModel,
+  availableModels,
 }: {
   configured: boolean;
   source: "app" | "environment" | null;
+  modelSource: "app" | "environment" | "default";
+  currentModel: string;
+  availableModels: string[];
 }) {
   const [state, formAction, isPending] = useActionState(saveApiKey, {});
+  const [modelState, modelAction, modelPending] = useActionState(saveAiModel, {});
 
   return (
     <div className="form-card">
-      <h2 className="link-heading">OpenRouter API key</h2>
+      <h2 className="link-heading">OpenRouter</h2>
       <p className="link-hint">
         Used only for the &quot;Ask AI to fill details&quot; option when adding coffee by store
         link. The key is stored in this app&apos;s local settings and is never sent to the
-        browser or included in exports. If unset here, the <code>OPENROUTER_API_KEY</code>{" "}
-        environment variable is used instead.
+        browser or included in exports.
       </p>
 
       <div className="field">
@@ -57,6 +63,44 @@ export default function SettingsForm({
           {configured && source === "app" ? (
             <button type="submit" name="remove" value="on" className="btn danger" disabled={isPending}>
               Remove
+            </button>
+          ) : null}
+        </div>
+      </form>
+
+      <div className="settings-divider" />
+
+      <form action={modelAction}>
+        <div className="field">
+          <label htmlFor="openrouterModel">Model</label>
+          <input
+            id="openrouterModel"
+            name="openrouterModel"
+            list="openrouter-model-list"
+            placeholder={currentModel}
+            defaultValue=""
+          />
+          <datalist id="openrouter-model-list">
+            {availableModels.map((m) => <option key={m} value={m} />)}
+          </datalist>
+          <span className="hint">
+            Using: <code>{currentModel}</code>
+            {modelSource === "app" ? " (saved here)" : modelSource === "environment" ? " (OPENROUTER_MODEL env)" : " (default)"}
+            {availableModels.length > 0
+              ? ` — type to search ${availableModels.length} models`
+              : " — add your API key to load the model list"}
+          </span>
+        </div>
+        {modelState.message ? (
+          <div className="form-error" style={{ marginTop: 12 }}>{modelState.message}</div>
+        ) : null}
+        <div className="form-actions" style={{ marginTop: 14 }}>
+          <button type="submit" className="btn" disabled={modelPending}>
+            {modelPending ? "Saving…" : "Save model"}
+          </button>
+          {modelSource === "app" ? (
+            <button type="submit" name="resetModel" value="on" className="btn danger" disabled={modelPending}>
+              Reset to default
             </button>
           ) : null}
         </div>

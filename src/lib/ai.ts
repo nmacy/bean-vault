@@ -6,7 +6,7 @@
  * (process.env.OPENROUTER_API_KEY) and is never sent to the client.
  */
 
-const DEFAULT_MODEL = "openai/gpt-4o-mini";
+export const DEFAULT_MODEL = "openai/gpt-4o-mini";
 const PAGE_FETCH_TIMEOUT_MS = 25_000;
 const AI_TIMEOUT_MS = 60_000;
 const MAX_PAGE_CHARS = 30_000;
@@ -130,14 +130,38 @@ function parseFields(data: unknown): AiCoffeeFields {
   };
 }
 
+/** Public model catalog from OpenRouter (id list for the model picker). */
+export async function openRouterModels(): Promise<string[]> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15_000);
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/models", { signal: ctrl.signal });
+    if (!res.ok) return [];
+    const data: unknown = await res.json();
+    if (typeof data !== "object" || data === null || !Array.isArray((data as Record<string, unknown>).data)) {
+      return [];
+    }
+    const models = (data as Record<string, unknown>).data as { id?: unknown }[];
+    return models
+      .map((m) => (typeof m === "object" && m !== null && typeof (m as Record<string, unknown>).id === "string" ? ((m as Record<string, unknown>).id as string) : ""))
+      .filter(Boolean)
+      .sort();
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export type EnrichResult =
   | { ok: true; fields: AiCoffeeFields }
   | { ok: false; message: string };
 
-export async function enrichCoffeePage(url: string, apiKey: string): Promise<EnrichResult> {
+export async function enrichCoffeePage(url: string, apiKey: string, modelOverride?: string): Promise<EnrichResult> {
   if (!apiKey) {
     return { ok: false, message: "OpenRouter API key is not configured." };
   }
+  const model = modelOverride || DEFAULT_MODEL;
 
   const text = await fetchPageText(url);
   if (!text) return { ok: false, message: "Could not read that store page." };
@@ -154,7 +178,7 @@ export async function enrichCoffeePage(url: string, apiKey: string): Promise<Enr
         "HTTP-Referer": "https://github.com/nmacy/coffee_tracker",
       },
       body: JSON.stringify({
-        model: process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL,
+        model: model,
         temperature: 0,
         max_tokens: 1200,
         response_format: { type: "json_object" },

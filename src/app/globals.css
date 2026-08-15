@@ -1768,3 +1768,8 @@ button.clickable {
   border-radius: 99px;
   padding: 2px 9px;
 }
+
+.settings-divider {
+  border-top: 1px solid var(--border);
+  margin: 20px 0;
+}

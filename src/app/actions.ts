@@ -10,7 +10,7 @@ import { dateField, dollarsToCents, intField, photoFile as readPhoto, requiredTe
 import { parseBeanconqueror } from "@/lib/beanconqueror";
 import { bestMatch, lookupProductPage, storeFor, storeProducts, type StoreProductDetail } from "@/lib/storefinder";
 import { parseCsv } from "@/lib/csv";
-import { enrichCoffeePage, type AiCoffeeFields } from "@/lib/ai";
+import { DEFAULT_MODEL, enrichCoffeePage, type AiCoffeeFields } from "@/lib/ai";
 import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -759,6 +759,7 @@ export type AiEnrichResult =
   | { ok: false; message: string };
 
 const SETTINGS_KEY = "openrouter_api_key";
+const SETTINGS_MODEL_KEY = "openrouter_model";
 
 /** Stored in-app key first, environment variable as fallback. */
 export async function resolveAiKey(): Promise<string> {
@@ -766,12 +767,37 @@ export async function resolveAiKey(): Promise<string> {
   return row[0]?.value || process.env.OPENROUTER_API_KEY || "";
 }
 
+/** Stored model first, then OPENROUTER_MODEL, then the built-in default. */
+export async function resolveAiModel(): Promise<string> {
+  const row = await db.select().from(settings).where(eq(settings.key, SETTINGS_MODEL_KEY));
+  return row[0]?.value || process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+}
+
 /** Fetch the product page server-side and ask the AI to fill coffee facts. */
 export async function aiEnrichProduct(url: string): Promise<AiEnrichResult> {
-  return enrichCoffeePage(url, await resolveAiKey());
+  return enrichCoffeePage(url, await resolveAiKey(), await resolveAiModel());
 }
 
 export type SettingsState = { message?: string };
+
+/** Save or remove the OpenRouter model selection. */
+export async function saveAiModel(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  if (formData.get("resetModel") === "on") {
+    await db.delete(settings).where(eq(settings.key, SETTINGS_MODEL_KEY));
+    return { message: "Model reset to the default." };
+  }
+  const value = text(formData, "openrouterModel");
+  if (!value) {
+    await db.delete(settings).where(eq(settings.key, SETTINGS_MODEL_KEY));
+    return { message: "Model reset to the default." };
+  }
+  await db
+    .insert(settings)
+    .values({ key: SETTINGS_MODEL_KEY, value })
+    .onConflictDoUpdate({ target: settings.key, set: { value } });
+  return { message: "Model saved." };
+}
+
 
 /** Save or remove the OpenRouter API key in the app's settings table. */
 export async function saveApiKey(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
