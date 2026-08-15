@@ -1762,3 +1762,13 @@ button.clickable {
   border-top: 1px solid var(--border);
   margin: 20px 0;
 }
+
+.ai-note {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  color: var(--muted);
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}

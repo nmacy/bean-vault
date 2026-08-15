@@ -68,7 +68,9 @@ export default function LinkImportForm() {
     setError(null);
     setProduct(null);
     setAiNote(null);
+    setAiFilled(null);
     setAiOnly(false);
+    setAiUsed(false);
     const res = await lookupProductLink(trimmed);
     setBusy(false);
     if (!res.ok) {
@@ -82,6 +84,8 @@ export default function LinkImportForm() {
     setVariantIndex(0);
     setPrice(first?.priceCents != null ? (first.priceCents / 100).toFixed(2) : "");
     setWeight(first?.weightGrams != null ? String(first.weightGrams) : "");
+    // Auto-fill: if a key is configured, run the AI right away.
+    await applyAiFill();
   }
 
   function chooseVariant(i: number) {
@@ -93,7 +97,7 @@ export default function LinkImportForm() {
     }
   }
 
-  async function askAi() {
+  async function applyAiFill() {
     if (!url.trim()) return;
     setAiBusy(true);
     setAiNote(null);
@@ -101,6 +105,8 @@ export default function LinkImportForm() {
     const res = await aiEnrichProduct(url.trim());
     setAiBusy(false);
     if (!res.ok) {
+      setAiFilled([]);
+      setAiUsed(false);
       setAiNote(res.message);
       return;
     }
@@ -153,6 +159,8 @@ export default function LinkImportForm() {
     setAiUsed(false);
     setAiNote(null);
   }
+
+  const aiNoKey = aiNote === "OpenRouter API key is not configured.";
 
   return (
     <div className="form-card link-card">
@@ -232,19 +240,21 @@ export default function LinkImportForm() {
             </div>
           ) : null}
 
-          <div className="form-actions">
-            <button type="button" className="btn secondary" onClick={() => void askAi()} disabled={aiBusy}>
-              {aiBusy ? "Asking AI…" : "Ask AI to fill details"}
-            </button>
-          </div>
           {aiUsed ? <input type="hidden" name="aiUsed" value="on" /> : null}
-          {aiNote ? (
-            <div className={aiFilled ? "ai-banner" : "form-error"}>
+          {aiBusy ? (
+            <div className="ai-banner">
               <span className="ai-banner-title">
                 <span className="ai-badge">AI</span>
-                {aiFilled ? "AI extracted details from the store page" : "AI note"}
+                Reading the store page and filling details…
               </span>
-              {aiFilled ? (
+            </div>
+          ) : aiNote ? (
+            aiFilled && aiFilled.length > 0 ? (
+              <div className="ai-banner">
+                <span className="ai-banner-title">
+                  <span className="ai-badge">AI</span>
+                  AI filled {aiFilled.length} field{aiFilled.length === 1 ? "" : "s"} from the store page
+                </span>
                 <span className="ai-banner-body">
                   {aiNote}
                   <span className="ai-chips">
@@ -253,15 +263,31 @@ export default function LinkImportForm() {
                     ))}
                   </span>
                 </span>
-              ) : (
+                <div className="form-actions" style={{ margin: 0 }}>
+                  <button type="button" className="btn btn-small btn-secondary" onClick={clearAi}>
+                    Undo AI fill
+                  </button>
+                </div>
+              </div>
+            ) : aiNoKey ? (
+              <p className="ai-note">
+                No AI fill — add an OpenRouter API key in{" "}
+                <Link href="/settings">Settings</Link> to auto-fill details.
+              </p>
+            ) : (
+              <div className="form-error">
                 <span className="ai-banner-body">{aiNote}</span>
-              )}
-              {aiFilled ? (
-                <button type="button" className="btn btn-small btn-secondary" onClick={clearAi}>
-                  Undo AI fill
+                <button
+                  type="button"
+                  className="btn btn-small btn-secondary"
+                  style={{ marginTop: 8 }}
+                  onClick={() => void applyAiFill()}
+                  disabled={aiBusy}
+                >
+                  Retry
                 </button>
-              ) : null}
-            </div>
+              </div>
+            )
           ) : null}
 
           <div className="form-grid">
