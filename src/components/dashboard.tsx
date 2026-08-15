@@ -50,6 +50,13 @@ function countBy<K>(items: K[]): Map<K, number> {
   return m;
 }
 
+/** "2025-06" → "Jun 2025"; year keys pass through as "2025". */
+function periodLabel(key: string): string {
+  if (key.length !== 7) return key;
+  const d = new Date(`${key}-01T00:00:00`);
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
+
 function median(nums: number[]): number | null {
   if (nums.length === 0) return null;
   const s = [...nums].sort((a, b) => a - b);
@@ -149,9 +156,6 @@ export default function Dashboard({ rows }: { rows: Row[] }) {
     return [1, 2, 3, 4, 5].map((n) => ({ label: "★".repeat(n), value: counts.get(n) ?? 0 })).filter((x) => x.value > 0);
   }, [filtered]);
 
-  const maxRoast = Math.max(1, ...roastDist.map((x) => x.value));
-  const maxBags = Math.max(1, ...timeline.map((b) => b.count));
-  const maxSpend = Math.max(1, ...timeline.map((b) => b.spend));
   const maxRoaster = Math.max(1, ...roasterDist.map((x) => x.value));
   const maxOrigin = Math.max(1, ...originDist.map((x) => x.value));
   const maxProcess = Math.max(1, ...processDist.map((x) => x.value));
@@ -208,12 +212,12 @@ export default function Dashboard({ rows }: { rows: Row[] }) {
       </div>
 
       <div className="dash-grid">
-        <Card title="Bags per period" subtitle={timeline.length ? `${timeline[0].label} — ${timeline[timeline.length - 1].label}` : undefined}>
-          <Bars data={timeline.map((b) => ({ label: b.label, value: b.count }))} max={maxBags} />
+        <Card title="Bags per period" subtitle={timeline.length ? `${periodLabel(timeline[0].label)} — ${periodLabel(timeline[timeline.length - 1].label)}` : undefined}>
+          <HBars data={timeline.map((b) => ({ label: periodLabel(b.label), value: b.count }))} max={Math.max(1, ...timeline.map((b) => b.count))} />
         </Card>
 
         <Card title="Spend per period" subtitle="Total price of bags in each period">
-          <Bars data={timeline.map((b) => ({ label: b.label, value: b.spend }))} max={maxSpend} valueFmt={(v) => formatCents(v)} />
+          <HBars data={timeline.map((b) => ({ label: periodLabel(b.label), value: b.spend }))} max={Math.max(1, ...timeline.map((b) => b.spend))} valueFmt={(v) => formatCents(v)} />
         </Card>
 
         <Card title="Roasters" subtitle="Bags per roaster">
@@ -225,7 +229,7 @@ export default function Dashboard({ rows }: { rows: Row[] }) {
         </Card>
 
         <Card title="Roast levels">
-          <Bars data={roastDist.map((x) => ({ label: x.label, value: x.value }))} max={maxRoast} />
+          <HBars data={roastDist.map((x) => ({ label: x.label, value: x.value }))} max={Math.max(1, ...roastDist.map((x) => x.value))} />
         </Card>
 
         <Card title="Process" subtitle="Processing methods">
@@ -278,7 +282,7 @@ function Card({ title, subtitle, children }: { title: string; subtitle?: string;
   );
 }
 
-function Bars({
+function HBars({
   data,
   max,
   valueFmt = (v) => String(v),
@@ -288,38 +292,15 @@ function Bars({
   valueFmt?: (v: number) => string;
 }) {
   if (data.length === 0) return <p className="dash-empty">Nothing in this period.</p>;
-  const step = Math.max(1, Math.ceil(data.length / 14));
-  return (
-    <div className="bars">
-      {data.map((d, i) => (
-        <div key={d.label} className="bar-col">
-          <div className="bar-slot" title={`${d.label}: ${valueFmt(d.value)}`}>
-            <div
-              className="bar-fill"
-              style={{
-                height: `${Math.max(d.value > 0 ? 4 : 1, (d.value / max) * 100)}%`,
-                background: i % 2 ? "var(--accent)" : "var(--stars)",
-              }}
-            />
-          </div>
-          <div className="bar-label">{i % step === 0 ? d.label.slice(2) : ""}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function HBars({ data, max }: { data: { label: string; value: number }[]; max: number }) {
-  if (data.length === 0) return <p className="dash-empty">Nothing in this period.</p>;
   return (
     <div className="hbars">
       {data.map((d) => (
         <div key={d.label} className="hbar-row">
           <span className="hbar-label" title={d.label}>{d.label}</span>
           <div className="hbar-track">
-            <div className="hbar-fill" style={{ width: `${(d.value / max) * 100}%` }} />
+            <div className="hbar-fill" style={{ width: `${(d.value / max) * 100}%` }} title={`${d.label}: ${valueFmt(d.value)}`} />
           </div>
-          <span className="hbar-value">{d.value}</span>
+          <span className="hbar-value">{valueFmt(d.value)}</span>
         </div>
       ))}
     </div>
