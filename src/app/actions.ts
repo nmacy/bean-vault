@@ -5,9 +5,10 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { coffees } from "@/db/schema";
-import { deletePhoto, savePhoto } from "@/lib/photos";
+import { deletePhoto, savePhoto, savePhotoBytes } from "@/lib/photos";
 import { dateField, dollarsToCents, intField, photoFile as readPhoto, requiredText, text } from "@/lib/validation";
 import { parseBeanconqueror } from "@/lib/beanconqueror";
+import { bestMatch, storeFor, storeProducts } from "@/lib/storefinder";
 
 export type FormState = { message?: string };
 
@@ -233,4 +234,79 @@ export async function deleteCoffee(id: number): Promise<void> {
   await deletePhoto(existing.photoFile);
   revalidatePath("/");
   redirect("/");
+}
+
+/* ---------- auto photo lookup (roaster storefront) ---------- */
+
+export type FindPhotoResult =
+  | { ok: true; photoFile: string }
+  | { ok: false; message: string };
+
+const DOWNLOAD_TIMEOUT_MS = 20_000;
+const MAX_DOWNLOAD_BYTES = 12 * 1024 * 1024;
+
+const MIME_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/avif": "avif",
+};
+
+async function downloadImage(url: string): Promise<{ data: Uint8Array; ext: string } | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), DOWNLOAD_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { redirect: "follow", signal: ctrl.signal });
+    if (!res.ok) return null;
+    const contentType = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    const buffer = new Uint8Array(await res.arrayBuffer());
+    if (buffer.length === 0 || buffer.length > MAX_DOWNLOAD_BYTES) return null;
+    const urlExt = url.match(/\.(jpe?g|png|webp|gif|avif)(?:[?#]|$)/i)?.[1].toLowerCase().replace("jpeg", "jpg");
+    const resolvedExt = MIME_EXT[contentType] ?? urlExt;
+    return resolvedExt ? { data: buffer, ext: resolvedExt } : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Find the store page for this coffee (Shopify /products.json or WooCommerce
+ * REST feed), match the bag by fuzzy product-title comparison, and save that
+ * product's main image as the coffee photo.
+ */
+export async function findCoffeePhoto(id: number): Promise<FindPhotoResult> {
+  const [coffee] = await db.select().from(coffees).where(eq(coffees.id, id));
+  if (!coffee) return { ok: false, message: "Coffee not found." };
+  if (coffee.photoFile) return { ok: false, message: "Already has a photo." };
+
+  const store = storeFor(coffee.roaster);
+  if (!store) return { ok: false, message: `No store feed found for "${coffee.roaster}".` };
+
+  const products = await storeProducts(store);
+  if (products.length === 0) return { ok: false, message: `Could not load ${coffee.roaster}'s products.` };
+
+  const match = bestMatch(coffee.name, products);
+  if (!match?.imageUrl) {
+    return { ok: false, message: `No product matched "${coffee.name}".` };
+  }
+
+  const image = await downloadImage(match.imageUrl);
+  if (!image) return { ok: false, message: "Could not download the product image." };
+
+  let photoFile: string;
+  try {
+    photoFile = await savePhotoBytes(image.data, image.ext);
+  } catch {
+    return { ok: false, message: "Could not save the product image." };
+  }
+
+  await db.update(coffees).set({ photoFile, updatedAt: new Date() }).where(eq(coffees.id, id));
+  revalidatePath("/");
+  revalidatePath("/grid");
+  revalidatePath(`/coffees/${id}`);
+  return { ok: true, photoFile };
 }

@@ -35,8 +35,8 @@ export default async function GridPage() {
         <Link href="/" className="btn secondary">View cards</Link>
       </div>
       <p className="grid-intro">
-        Edit any cell, then save once. Changed cells are highlighted until saved.
-        Click a photo to open that coffee.
+        Edit any cell — changes save automatically when you leave the cell.
+        Click column headers to sort; use the filters to narrow the list.
       </p>
       <GridEditor beans={all.map((b) => ({ ...b }))} />
     </main>

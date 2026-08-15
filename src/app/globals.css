@@ -502,6 +502,110 @@ img {
   flex-wrap: wrap;
 }
 
+.filter-search {
+  font: inherit;
+  font-size: 13.5px;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  min-width: 220px;
+}
+
+.filter-search:focus {
+  outline: 2px solid rgb(111 78 55 / 35%);
+  border-color: var(--accent);
+}
+
+.filter-select {
+  font: inherit;
+  font-size: 13.5px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  max-width: 190px;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.filter-count {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.th-sort {
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.th-sort:hover {
+  color: var(--ink);
+}
+
+.th-sort.active {
+  color: var(--accent);
+}
+
+.col-status {
+  width: 110px;
+}
+
+.status-chip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+.status-chip.saving,
+.status-chip.finding {
+  background: #f4ede3;
+  color: var(--muted);
+}
+
+.status-chip.saved {
+  background: #eef7ee;
+  color: #2e6b32;
+}
+
+.status-chip.error {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.cell-error {
+  outline: 2px solid var(--danger) !important;
+  outline-offset: -1px;
+  background: var(--danger-bg) !important;
+}
+
+.grid-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 40px 16px !important;
+}
+
 .grid-saved {
   color: #2e6b32;
   font-weight: 600;

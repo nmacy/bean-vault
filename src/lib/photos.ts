@@ -19,21 +19,23 @@ function extOf(filename: string): string | null {
   return ALLOWED_EXTS.has(ext) ? ext : null;
 }
 
+export async function savePhotoBytes(data: Uint8Array, ext: string): Promise<string> {
+  const e = ext.toLowerCase().replace(/^\./, "");
+  if (!ALLOWED_EXTS.has(e)) throw new Error(`Unsupported image type: ${e}`);
+  if (data.length === 0) throw new Error("Photo is empty.");
+  if (data.length > MAX_PHOTO_BYTES) throw new Error("Photo is larger than 10 MB.");
+  const name = `${randomBytes(16).toString("hex")}.${e}`;
+  await mkdir(UPLOAD_DIR, { recursive: true });
+  await writeFile(path.join(UPLOAD_DIR, name), data);
+  return name;
+}
+
 export async function savePhoto(file: File): Promise<string> {
   const ext = extOf(file.name);
   if (!ext) {
     throw new Error("Unsupported image type. Use JPG, PNG, WebP, AVIF or GIF.");
   }
-  if (file.size === 0) {
-    throw new Error("Photo is empty.");
-  }
-  if (file.size > MAX_PHOTO_BYTES) {
-    throw new Error("Photo is larger than 10 MB.");
-  }
-  const name = `${randomBytes(16).toString("hex")}.${ext}`;
-  await mkdir(UPLOAD_DIR, { recursive: true });
-  await writeFile(path.join(UPLOAD_DIR, name), Buffer.from(await file.arrayBuffer()));
-  return name;
+  return savePhotoBytes(Buffer.from(await file.arrayBuffer()), ext);
 }
 
 export async function deletePhoto(name: string | null): Promise<void> {

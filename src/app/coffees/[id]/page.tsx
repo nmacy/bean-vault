@@ -6,6 +6,7 @@ import { coffees } from "@/db/schema";
 import { formatCents, photoUrl } from "@/lib/format";
 import { cap } from "@/lib/cap";
 import DeleteButton from "@/components/delete-button";
+import FindPhotoButton from "@/components/find-photo-button";
 
 export const metadata = { title: "Coffee · Coffee Tracker" };
 export const dynamic = "force-dynamic";
@@ -60,6 +61,7 @@ export default async function CoffeeDetailPage({ params }: { params: Promise<{ i
 
           <div className="actions">
             <Link href={`/coffees/${coffee.id}/edit`} className="btn">Edit</Link>
+            {!coffee.photoFile ? <FindPhotoButton id={coffee.id} /> : null}
             <DeleteButton id={coffee.id} />
           </div>
         </div>
