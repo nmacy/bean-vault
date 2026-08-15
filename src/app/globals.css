@@ -795,27 +795,49 @@ img {
 }
 
 .nav-toggle {
-  display: grid;
-  place-items: center;
-  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   width: 42px;
   height: 42px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--surface);
   cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
 }
 
 .nav-toggle:hover {
-  background: var(--bg);
+  background: var(--hover-tint);
+  border-color: var(--accent);
+}
+
+.nav-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
 }
 
 .hamburger-bar {
   display: block;
-  width: 20px;
+  width: 18px;
   height: 2px;
-  border-radius: 1px;
+  border-radius: 2px;
   background: var(--ink);
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.nav-menu.open .hamburger-bar:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.nav-menu.open .hamburger-bar:nth-child(2) {
+  opacity: 0;
+}
+
+.nav-menu.open .hamburger-bar:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
 }
 
 .nav-panel {

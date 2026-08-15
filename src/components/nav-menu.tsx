@@ -33,7 +33,7 @@ export default function NavMenu() {
   }, [open]);
 
   return (
-    <nav className="nav-menu" ref={ref} aria-label="Main">
+    <nav className={`nav-menu${open ? " open" : ""}`} ref={ref} aria-label="Main">
       <button
         type="button"
         className="nav-toggle"
