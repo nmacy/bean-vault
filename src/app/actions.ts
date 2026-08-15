@@ -778,24 +778,24 @@ export async function aiEnrichProduct(url: string): Promise<AiEnrichResult> {
   return enrichCoffeePage(url, await resolveAiKey(), await resolveAiModel());
 }
 
-export type SettingsState = { message?: string };
+export type SettingsState = { message?: string; ok?: boolean };
 
 /** Save or remove the OpenRouter model selection. */
 export async function saveAiModel(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
   if (formData.get("resetModel") === "on") {
     await db.delete(settings).where(eq(settings.key, SETTINGS_MODEL_KEY));
-    return { message: "Model reset to the default." };
+    return { message: "Model reset to the default.", ok: true };
   }
   const value = text(formData, "openrouterModel");
   if (!value) {
     await db.delete(settings).where(eq(settings.key, SETTINGS_MODEL_KEY));
-    return { message: "Model reset to the default." };
+    return { message: "Model reset to the default.", ok: true };
   }
   await db
     .insert(settings)
     .values({ key: SETTINGS_MODEL_KEY, value })
     .onConflictDoUpdate({ target: settings.key, set: { value } });
-  return { message: "Model saved." };
+  return { message: "Model saved.", ok: true };
 }
 
 
@@ -803,7 +803,7 @@ export async function saveAiModel(_prev: SettingsState, formData: FormData): Pro
 export async function saveApiKey(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
   if (formData.get("remove") === "on") {
     await db.delete(settings).where(eq(settings.key, SETTINGS_KEY));
-    return { message: "API key removed." };
+    return { message: "API key removed.", ok: true };
   }
   const value = text(formData, "openrouterApiKey");
   if (!value) return { message: "Enter a key, or use Remove." };
@@ -812,5 +812,5 @@ export async function saveApiKey(_prev: SettingsState, formData: FormData): Prom
     .insert(settings)
     .values({ key: SETTINGS_KEY, value })
     .onConflictDoUpdate({ target: settings.key, set: { value } });
-  return { message: "API key saved." };
+  return { message: "API key saved.", ok: true };
 }

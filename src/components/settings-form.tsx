@@ -42,7 +42,7 @@ export default function SettingsForm({
       </div>
 
       {state.message ? (
-        <div className="form-error" style={{ marginTop: 12 }}>{state.message}</div>
+        <div className={state.ok ? "import-ok" : "form-error"} style={{ marginTop: 12 }}>{state.message}</div>
       ) : null}
 
       <form action={formAction} style={{ marginTop: 14 }}>
@@ -92,7 +92,7 @@ export default function SettingsForm({
           </span>
         </div>
         {modelState.message ? (
-          <div className="form-error" style={{ marginTop: 12 }}>{modelState.message}</div>
+          <div className={modelState.ok ? "import-ok" : "form-error"} style={{ marginTop: 12 }}>{modelState.message}</div>
         ) : null}
         <div className="form-actions" style={{ marginTop: 14 }}>
           <button type="submit" className="btn" disabled={modelPending}>
