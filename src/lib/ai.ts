@@ -89,6 +89,31 @@ function extractJson(raw: string): unknown {
   return null;
 }
 
+/** Agtron roast-color number → roast level (higher = lighter). */
+function agtronToRoast(n: number): string | null {
+  if (n >= 76) return "light";
+  if (n >= 65) return "medium-light";
+  if (n >= 55) return "medium";
+  if (n >= 45) return "medium-dark";
+  if (n >= 20) return "dark";
+  return null;
+}
+
+/** Best-effort elevation straight from page text ("1,900–2,100 masl"). */
+function findElevation(text: string): string | null {
+  const m = text.match(
+    /(?:elevation|altitude)\D{0,60}([\d][\d,.]*(?:\s*[-–—to]\s*[\d][\d,.]*)?)\s*(masl|meters|m\.a\.s\.l|m)/i,
+  ) ?? text.match(/([\d][\d,.]*(?:\s*[-–—]\s*[\d][\d,.]*)?)\s*(masl|m\.a\.s\.l)(?:\.|\s|,|$)/i);
+  if (!m) return null;
+  return `${m[1]} ${m[2].toLowerCase().replace(".", "")}`;
+}
+
+/** Agtron number from page text ("Agtron 63", "agatron #57"). */
+function findAgtron(text: string): number | null {
+  const m = text.match(/aga?t?t?r?on\D{0,12}(?:#|no\.?)?\s*(\d{2,3})/i) ?? text.match(/(?:agat?t?ron|a-gt)\s*:\s*(\d{2,3})/i);
+  return m ? Number(m[1]) : null;
+}
+
 function cleanString(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const t = v.trim();
@@ -103,6 +128,11 @@ function parseFields(data: unknown): AiCoffeeFields {
     const fuzzy = roastLevel.replace(/[-_\s]/g, "");
     const hit = ROAST_LEVELS.find((l) => l.replace(/-/g, "") === fuzzy || l.startsWith(fuzzy.slice(0, 6)));
     roastLevel = hit ?? null;
+  }
+  const agtronRaw = cleanString(rec.agtron);
+  const agtron = agtronRaw ? Number(agtronRaw.replace(/[^\d]/g, "")) : null;
+  if (!roastLevel && agtron !== null && Number.isFinite(agtron)) {
+    roastLevel = agtronToRoast(agtron);
   }
   const mixRaw = cleanString(rec.mix)?.toLowerCase() ?? null;
   const mix =
@@ -188,8 +218,10 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
             content:
               "You extract facts about a bag of coffee from a store product page. " +
               "Return ONLY a JSON object with these keys: country, region, variety, " +
-              "producer (grower or farm), elevation (in meters/masl), process, " +
+              "producer (grower or farm), elevation (copy the number and unit exactly " +
+              "as printed, e.g. \"1,900–2,100 masl\"), process, " +
               "roastLevel (one of: light, medium-light, medium, medium-dark, dark), " +
+              "agtron (the Agtron roast color number if listed, e.g. \"63\"), " +
               "mix (blend or single-origin), decaffeinated (boolean), tastingNotes, " +
               "description. Use null when the page does not say. If the page " +
               "mentions bag size options, ignore them.",
@@ -234,5 +266,12 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
   if (parsed === null) {
     return { ok: false, message: "The AI did not return usable JSON." };
   }
-  return { ok: true, fields: parseFields(parsed) };
+  const fields = parseFields(parsed);
+  // Deterministic fallbacks straight from the page text.
+  if (!fields.elevation) fields.elevation = findElevation(text);
+  if (!fields.roastLevel) {
+    const agtron = findAgtron(text);
+    if (agtron !== null) fields.roastLevel = agtronToRoast(agtron);
+  }
+  return { ok: true, fields };
 }
