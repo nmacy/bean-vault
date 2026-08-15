@@ -23,7 +23,7 @@ export default async function CoffeeDetailPage({ params }: { params: Promise<{ i
 
   return (
     <main className="page">
-      <Link href="/coffees" className="back-link">← Back to all coffees</Link>
+      <Link href="/coffees" className="back-link">← Back to coffees</Link>
       <div className="detail">
         <div className="detail-photo">
           {src ? (

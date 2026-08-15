@@ -6,7 +6,7 @@ export const metadata = { title: "Data · Bean Vault" };
 export default function DataPage() {
   return (
     <main className="page page-narrow">
-      <Link href="/coffees" className="back-link">← Back to all coffees</Link>
+      <Link href="/coffees" className="back-link">← Back to coffees</Link>
       <div className="page-head">
         <h1>Data</h1>
       </div>

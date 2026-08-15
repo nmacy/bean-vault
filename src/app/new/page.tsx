@@ -8,7 +8,7 @@ export const metadata = { title: "Add coffee · Bean Vault" };
 export default function NewCoffeePage() {
   return (
     <main className="page">
-      <Link href="/coffees" className="back-link">← Back to all coffees</Link>
+      <Link href="/coffees" className="back-link">← Back to coffees</Link>
       <div className="page-head">
         <h1>Add coffee</h1>
       </div>
