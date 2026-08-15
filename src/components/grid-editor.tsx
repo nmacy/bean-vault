@@ -119,7 +119,7 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
   const [statuses, setStatuses] = useState<Record<number, Status>>({});
   const [cellErrors, setCellErrors] = useState<Record<number, { roaster?: boolean; name?: boolean }>>({});
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
-  const [filters, setFilters] = useState({ search: "", roaster: "", roast: "", rating: "" });
+  const [filters, setFilters] = useState({ search: "", roaster: "", roast: "", rating: "", year: "" });
 
   const rowsRef = useRef(rows);
   const draftsRef = useRef(drafts);
@@ -302,6 +302,17 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
 
   const batchCount = useMemo(() => rows.filter((r) => !r.row.photoFile).length, [rows]);
 
+  /** Bag year: roast date primarily (the vintage), purchase date as fallback. */
+  function yearOf(cell: Cell): string | null {
+    return cell.roastDate.slice(0, 4) || cell.purchaseDate.slice(0, 4) || null;
+  }
+
+  const years = useMemo(
+    () =>
+      [...new Set(rows.map(({ cell }) => yearOf(cell)).filter((y): y is string => y !== null))].sort().reverse(),
+    [rows],
+  );
+
   const visible = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
     let list = rows.filter(({ row, cell }) => {
@@ -315,6 +326,10 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
       if (filters.rating) {
         const v = row.rating;
         if (filters.rating === "none" ? v != null : v !== Number(filters.rating)) return false;
+      }
+      if (filters.year) {
+        const y = yearOf(cell);
+        if (filters.year === "__none__" ? y !== null : y !== filters.year) return false;
       }
       return true;
     });
@@ -357,7 +372,7 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
   }
 
   function resetFilters() {
-    setFilters({ search: "", roaster: "", roast: "", rating: "" });
+    setFilters({ search: "", roaster: "", roast: "", rating: "", year: "" });
   }
 
   return (
@@ -378,12 +393,17 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
           {ROAST_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
           <option value="__none__">No roast level</option>
         </select>
+        <select className="filter-select" value={filters.year} onChange={(e) => setFilters((f) => ({ ...f, year: e.target.value }))}>
+          <option value="">Any year</option>
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+          <option value="__none__">No year</option>
+        </select>
         <select className="filter-select" value={filters.rating} onChange={(e) => setFilters((f) => ({ ...f, rating: e.target.value }))}>
           <option value="">Any rating</option>
           {[1, 2, 3, 4, 5].map((r) => <option key={r} value={r}>{r}★</option>)}
           <option value="none">Unrated</option>
         </select>
-        {(filters.search || filters.roaster || filters.roast || filters.rating) ? (
+        {(filters.search || filters.roaster || filters.roast || filters.rating || filters.year) ? (
           <button type="button" className="btn secondary btn-small" onClick={resetFilters}>Reset</button>
         ) : null}
         <span className="filter-count">{visible.length} of {rows.length}</span>
