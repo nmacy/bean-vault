@@ -1,6 +1,6 @@
 services:
   coffee-tracker:
-    image: nmacy/coffee-tracker:latest
+    image: ghcr.io/nmacy/coffee-tracker:latest
     restart: unless-stopped
     ports:
       - "3000:3000"

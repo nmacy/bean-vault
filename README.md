@@ -42,25 +42,32 @@ Back up the whole `data/` directory. Local data is gitignored.
 
 ## Docker (homelab)
 
-Build for the lab's `linux/amd64` (works from any host, e.g. an M-series Mac):
+Image: `ghcr.io/nmacy/coffee-tracker:latest` (linux/amd64; already pushed).
+
+Build locally for the lab's `linux/amd64` (works from any host, e.g. an
+M-series Mac) and push:
 
 ```bash
-docker buildx build --platform linux/amd64 -t <your-registry>/coffee-tracker:latest .
-docker push <your-registry>/coffee-tracker:latest
+docker buildx build --platform linux/amd64 -t ghcr.io/nmacy/coffee-tracker:latest .
+docker push ghcr.io/nmacy/coffee-tracker:latest   # after: echo $GH_CR_PAT | docker login ghcr.io -u nmacy --password-stdin
 ```
 
-Run on the lab (Deiban x64 + Docker):
+Run on the lab (Debian x64 + Docker):
 
 ```sh
 docker run -d --name coffee-tracker -p 3000:3000 \
   -v coffee-tracker-data:/app/data \
   --restart unless-stopped \
-  <your-registry>/coffee-tracker:latest
+  ghcr.io/nmacy/coffee-tracker:latest
 ```
 
 or `docker compose up -d` using the included `docker-compose.yml`.
 
+- ghcr packages default to **private**; for an unauthenticated `docker pull` on
+  the lab, set the package visible: GitHub → your profile → Packages →
+  Coffee Tracker → Package settings → Danger Zone → Change visibility → Public.
+  Otherwise log the lab in first: `echo $PAT | docker login ghcr.io -u nmacy
+  --password-stdin` (a PAT with `read:packages`).
 - All persistence lives in the `/app/data` volume: SQLite DB (auto-migrated on
   first start) plus uploaded photos. Back up that volume, not the container.
-- Runs as a non-root `node` user; listens on `:3000` (map to 80/443 with a
-  reverse proxy as you like).
+- Runs as a non-root `node` user; listens on `:3000`.
