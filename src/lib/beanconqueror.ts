@@ -37,6 +37,16 @@ const ROAST_MAP: Record<string, string> = {
   DARK: "dark",
 };
 
+/** Beanconqueror roast_range slider (0–5, 0.5 steps; 0 = unset) → our levels. */ 
+function roastRangeToLevel(v: number | null): string | null {
+  if (v === null || v <= 0) return null;
+  if (v <= 1) return "light";
+  if (v <= 2) return "medium-light";
+  if (v <= 3) return "medium";
+  if (v <= 4) return "medium-dark";
+  return "dark";
+}
+
 function isoDate(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const match = value.trim().match(/^(\d{4}-\d{2}-\d{2})/);
@@ -133,7 +143,10 @@ export function parseBeanconqueror(text: string): BeanconquerorImport {
 
     const roastRaw = str(b.roast);
     const roastCustom = str(b.roast_custom);
-    const roastLevel = (roastRaw && ROAST_MAP[roastRaw]) || (roastCustom ? roastCustom.toLowerCase() : null);
+    const roastLevel =
+      (roastRaw && ROAST_MAP[roastRaw]) ||
+      (roastCustom ? roastCustom.toLowerCase() : null) ||
+      roastRangeToLevel(num(b.roast_range));
 
     const cost = num(b.cost);
     const weight = num(b.weight);
