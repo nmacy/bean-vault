@@ -11,6 +11,24 @@ import {
 
 const ROAST_LEVELS = ["light", "medium-light", "medium", "medium-dark", "dark"];
 
+function sanitizePrice(v: string): string {
+  let out = "";
+  let dot = false;
+  for (const ch of v) {
+    if (ch >= "0" && ch <= "9") out += ch;
+    else if (ch === "." && !dot) { out += ch; dot = true; }
+  }
+  return out.slice(0, 10);
+}
+
+function sanitizeWeight(v: string): string {
+  return v.replace(/\D/g, "").slice(0, 7);
+}
+
+function sanitizeElevation(v: string): string {
+  return v.replace(/[^0-9.,\-\s]/g, "").slice(0, 40);
+}
+
 export default function LinkImportForm() {
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
@@ -235,35 +253,35 @@ export default function LinkImportForm() {
             </div>
             <div className="field">
               <label htmlFor="link-price">Price <span className="hint">(USD)</span></label>
-              <input id="link-price" name="price" type="number" inputMode="decimal" step="0.01" min="0" value={price} onChange={(e) => setPrice(e.target.value)} />
+              <input id="link-price" name="price" type="text" inputMode="decimal" value={price} onChange={(e) => setPrice(sanitizePrice(e.target.value))} placeholder="18.00" maxLength={10} />
             </div>
             <div className="field">
               <label htmlFor="link-weight">Weight <span className="hint">(g)</span></label>
-              <input id="link-weight" name="weight" type="number" inputMode="numeric" step="1" min="1" value={weight} onChange={(e) => setWeight(e.target.value)} />
+              <input id="link-weight" name="weight" type="text" inputMode="numeric" value={weight} onChange={(e) => setWeight(sanitizeWeight(e.target.value))} placeholder="250" maxLength={7} />
             </div>
             <div className="field">
               <label htmlFor="link-country">Country</label>
-              <input id="link-country" name="country" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. Colombia" />
+              <input id="link-country" name="country" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. Colombia" maxLength={120} />
             </div>
             <div className="field">
               <label htmlFor="link-region">Region</label>
-              <input id="link-region" name="region" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="e.g. Santa Monica" />
+              <input id="link-region" name="region" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="e.g. Santa Monica" maxLength={120} />
             </div>
             <div className="field">
               <label htmlFor="link-variety">Variety</label>
-              <input id="link-variety" name="variety" value={variety} onChange={(e) => setVariety(e.target.value)} placeholder="e.g. Gesha" />
+              <input id="link-variety" name="variety" value={variety} onChange={(e) => setVariety(e.target.value)} placeholder="e.g. Gesha" maxLength={120} />
             </div>
             <div className="field">
               <label htmlFor="link-producer">Producer</label>
-              <input id="link-producer" name="producer" value={producer} onChange={(e) => setProducer(e.target.value)} placeholder="Farm or grower" />
+              <input id="link-producer" name="producer" value={producer} onChange={(e) => setProducer(e.target.value)} placeholder="Farm or grower" maxLength={120} />
             </div>
             <div className="field">
               <label htmlFor="link-elevation">Elevation</label>
-              <input id="link-elevation" name="elevation" value={elevation} onChange={(e) => setElevation(e.target.value)} placeholder="e.g. 1,900–2,100 (masl)" />
+              <input id="link-elevation" name="elevation" value={elevation} onChange={(e) => setElevation(sanitizeElevation(e.target.value))} placeholder="e.g. 1,900–2,100 (masl)" maxLength={40} />
             </div>
             <div className="field">
               <label htmlFor="link-process">Process</label>
-              <input id="link-process" name="process" value={process} onChange={(e) => setProcess(e.target.value)} placeholder="e.g. washed" />
+              <input id="link-process" name="process" value={process} onChange={(e) => setProcess(e.target.value)} placeholder="e.g. washed" maxLength={120} />
             </div>
             <div className="field">
               <label htmlFor="link-roast">Roast level</label>
@@ -289,11 +307,11 @@ export default function LinkImportForm() {
             </div>
             <div className="field wide">
               <label htmlFor="link-tasting">Tasting notes</label>
-              <textarea id="link-tasting" name="tastingNotes" value={tastingNotes} onChange={(e) => setTastingNotes(e.target.value)} placeholder="Sweet citrus, chocolate, syrupy body…" />
+              <textarea id="link-tasting" name="tastingNotes" value={tastingNotes} onChange={(e) => setTastingNotes(e.target.value)} placeholder="Sweet citrus, chocolate, syrupy body…" maxLength={120} />
             </div>
             <div className="field wide">
               <label htmlFor="link-notes">Notes / description</label>
-              <textarea id="link-notes" name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything worth remembering about this bag…" />
+              <textarea id="link-notes" name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything worth remembering about this bag…" maxLength={120} />
             </div>
           </div>
 

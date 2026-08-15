@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { coffees, settings } from "@/db/schema";
 import { deletePhoto, downloadRemoteImage, savePhoto, savePhotoBytes } from "@/lib/photos";
-import { dateField, dollarsToCents, intField, photoFile as readPhoto, requiredText, text } from "@/lib/validation";
+import { dateField, dollarsToCents, elevationField, intField, photoFile as readPhoto, requiredText, text } from "@/lib/validation";
 import { parseBeanconqueror } from "@/lib/beanconqueror";
 import { bestMatch, lookupProductPage, storeFor, storeProducts, type StoreProductDetail } from "@/lib/storefinder";
 import { parseCsv } from "@/lib/csv";
@@ -153,6 +153,19 @@ export async function importBeanconqueror(_prev: ImportState, formData: FormData
 }
 
 function collect(form: FormData) {
+  const priceCents = dollarsToCents(form, "price");
+  const weightGrams = intField(form, "weight", 1, 1_000_000);
+  const elevation = elevationField(form, "elevation");
+  const errors: string[] = [];
+  if (text(form, "price") !== null && priceCents === null) {
+    errors.push("Price must be a number (no commas or units).");
+  }
+  if (text(form, "weight") !== null && weightGrams === null) {
+    errors.push("Weight must be a whole number in grams (no commas or units).");
+  }
+  if (text(form, "elevation") !== null && elevation === null) {
+    errors.push("Elevation must be numbers only (no units), e.g. 1,900–2,100.");
+  }
   return {
     roaster: requiredText(form, "roaster"),
     name: requiredText(form, "name"),
@@ -161,17 +174,18 @@ function collect(form: FormData) {
     mix: text(form, "mix"),
     variety: text(form, "variety"),
     producer: text(form, "producer"),
-    elevation: text(form, "elevation"),
+    elevation,
     process: text(form, "process"),
     roastLevel: text(form, "roastLevel"),
     roastDate: dateField(form, "roastDate"),
     purchaseDate: dateField(form, "purchaseDate"),
-    priceCents: dollarsToCents(form, "price"),
-    weightGrams: intField(form, "weight", 1, 1_000_000),
+    priceCents,
+    weightGrams,
     rating: intField(form, "rating", 1, 5),
     notes: text(form, "notes"),
     tastingNotes: text(form, "tastingNotes"),
     decaffeinated: form.get("decaffeinated") === "on",
+    errors,
   };
 }
 
@@ -179,6 +193,7 @@ type Collected = ReturnType<typeof collect>;
 
 export async function createCoffee(_prev: FormState, formData: FormData): Promise<FormState> {
   const input = collect(formData);
+  if (input.errors.length > 0) return { message: input.errors[0] };
   if (!input.roaster) return { message: "Roaster is required." };
   if (!input.name) return { message: "Coffee name is required." };
 
@@ -245,6 +260,7 @@ export async function updateCoffee(id: number, _prev: FormState, formData: FormD
   if (!existing) return { message: "Coffee not found." };
 
   const input = collect(formData);
+  if (input.errors.length > 0) return { message: input.errors[0] };
   if (!input.roaster) return { message: "Roaster is required." };
   if (!input.name) return { message: "Coffee name is required." };
 
@@ -355,11 +371,20 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
   const nameOverride = text(formData, "name");
   const priceOverride = dollarsToCents(formData, "price");
   const weightOverride = intField(formData, "weight", 1, 1_000_000);
+  const elevation = elevationField(formData, "elevation");
+  if (text(formData, "price") !== null && priceOverride === null) {
+    return { message: "Price must be a number (no commas or units)." };
+  }
+  if (text(formData, "weight") !== null && weightOverride === null) {
+    return { message: "Weight must be a whole number in grams (no commas or units)." };
+  }
+  if (text(formData, "elevation") !== null && elevation === null) {
+    return { message: "Elevation must be numbers only (no units), e.g. 1,900–2,100." };
+  }
   const country = text(formData, "country");
   const region = text(formData, "region");
   const variety = text(formData, "variety");
   const producer = text(formData, "producer");
-  const elevation = text(formData, "elevation");
   const process = text(formData, "process");
   const roastLevel = text(formData, "roastLevel");
   const tastingNotes = text(formData, "tastingNotes");

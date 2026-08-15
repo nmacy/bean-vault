@@ -1,12 +1,39 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import Link from "next/link";
 import type { Coffee } from "@/db/schema";
 import type { FormState } from "@/app/actions";
 
 const ROAST_LEVELS = ["light", "medium-light", "medium", "medium-dark", "dark"];
 const PROCESS_SUGGESTIONS = ["washed", "natural", "honey", "anaerobic", "carbonic maceration"];
+
+/** Block any key that is not a digit (or a single decimal point for price). */
+function numericKeydown(allowDot: boolean) {
+  return (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.key.length > 1) return;
+    if (allowDot && e.key === ".") return;
+    if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+  };
+}
+
+/** Block pastes containing anything but digits/one dot. */
+function numericPaste(e: ClipboardEvent<HTMLInputElement>, allowDot: boolean) {
+  const text = e.clipboardData.getData("text");
+  if ((allowDot ? /[^0-9.]/.test(text) || (text.match(/\./g)?.length ?? 0) > 1 : /[^0-9]/.test(text))) {
+    e.preventDefault();
+  }
+}
+
+/** Elevation: digits, commas, dots and range dashes only. */
+function elevationKeyguard(e: KeyboardEvent<HTMLInputElement>) {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.key.length > 1) return;
+  if (!/^[0-9.,\-\s]$/.test(e.key)) e.preventDefault();
+}
+
+function elevationPaste(e: ClipboardEvent<HTMLInputElement>) {
+  if (/[^0-9.,\-\s]/.test(e.clipboardData.getData("text"))) e.preventDefault();
+}
 
 type Props = {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
@@ -30,11 +57,11 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
         <div className="form-grid">
           <div className="field">
             <label htmlFor="roaster">Roaster *</label>
-            <input id="roaster" name="roaster" required defaultValue={coffee?.roaster ?? ""} placeholder="e.g. Onyx Coffee Lab" />
+            <input id="roaster" name="roaster" required defaultValue={coffee?.roaster ?? ""} placeholder="e.g. Onyx Coffee Lab" maxLength={120} />
           </div>
           <div className="field">
             <label htmlFor="name">Coffee name *</label>
-            <input id="name" name="name" required defaultValue={coffee?.name ?? ""} placeholder="e.g. Southern Weather" />
+            <input id="name" name="name" required defaultValue={coffee?.name ?? ""} placeholder="e.g. Southern Weather" maxLength={120} />
           </div>
           <div className="field">
             <label htmlFor="country">Country</label>
@@ -42,7 +69,7 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
           </div>
           <div className="field">
             <label htmlFor="region">Region</label>
-            <input id="region" name="region" defaultValue={coffee?.region ?? ""} placeholder="e.g. Santa Monica" />
+            <input id="region" name="region" defaultValue={coffee?.region ?? ""} placeholder="e.g. Santa Monica" maxLength={80} />
           </div>
           <div className="field">
             <label htmlFor="mix">Type</label>
@@ -54,11 +81,11 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
           </div>
           <div className="field">
             <label htmlFor="variety">Variety</label>
-            <input id="variety" name="variety" defaultValue={coffee?.variety ?? ""} placeholder="e.g. Gesha, Bourbon" />
+            <input id="variety" name="variety" defaultValue={coffee?.variety ?? ""} placeholder="e.g. Gesha, Bourbon" maxLength={120} />
           </div>
           <div className="field">
             <label htmlFor="process">Process</label>
-            <input id="process" name="process" list="process-list" defaultValue={coffee?.process ?? ""} placeholder="e.g. washed" />
+            <input id="process" name="process" list="process-list" defaultValue={coffee?.process ?? ""} placeholder="e.g. washed" maxLength={80} />
             <datalist id="process-list">
               {PROCESS_SUGGESTIONS.map((p) => <option key={p} value={p} />)}
             </datalist>
@@ -89,11 +116,11 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
           </div>
           <div className="field">
             <label htmlFor="price">Price <span className="hint">(USD)</span></label>
-            <input id="price" name="price" type="number" inputMode="decimal" step="0.01" min="0" defaultValue={priceValue} placeholder="18.00" />
+            <input id="price" name="price" type="text" inputMode="decimal" defaultValue={priceValue} placeholder="18.00" maxLength={10} onKeyDown={numericKeydown(true)} onPaste={(e) => numericPaste(e, true)} />
           </div>
           <div className="field">
             <label htmlFor="weight">Weight <span className="hint">(g)</span></label>
-            <input id="weight" name="weight" type="number" inputMode="numeric" step="1" min="1" defaultValue={coffee?.weightGrams ?? ""} placeholder="250" />
+            <input id="weight" name="weight" type="text" inputMode="numeric" defaultValue={coffee?.weightGrams ?? ""} placeholder="250" maxLength={7} onKeyDown={numericKeydown(false)} onPaste={(e) => numericPaste(e, false)} />
           </div>
           <div className="field">
             <label htmlFor="rating">Rating</label>
