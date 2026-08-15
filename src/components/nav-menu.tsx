@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/grid", label: "Edit grid" },
   { href: "/import", label: "Import" },
   { href: "/new", label: "Add coffee" },
+  { href: "/api/export", label: "Export CSV" },
 ];
 
 export default function NavMenu() {
