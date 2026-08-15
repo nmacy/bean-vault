@@ -18,6 +18,62 @@ export type ImportState = {
   photosSkipped?: number;
 };
 
+export type GridRow = {
+  id: number;
+  roaster: string;
+  name: string;
+  origin: string | null;
+  variety: string | null;
+  process: string | null;
+  roastLevel: string | null;
+  roastDate: string | null;
+  purchaseDate: string | null;
+  priceCents: number | null;
+  weightGrams: number | null;
+  rating: number | null;
+};
+
+export type SaveGridResult = { saved: number; skipped?: number };
+
+/** Batched "spreadsheet" save: full-row write per changed coffee in one transaction. */
+export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
+  let saved = 0;
+  let skipped = 0;
+  db.transaction((tx) => {
+    for (const row of rows) {
+      const roaster = row.roaster.trim();
+      const name = row.name.trim();
+      if (!roaster || !name) {
+        skipped += 1;
+        continue;
+      }
+      const result = tx
+        .update(coffees)
+        .set({
+          roaster,
+          name,
+          origin: row.origin,
+          variety: row.variety,
+          process: row.process,
+          roastLevel: row.roastLevel,
+          roastDate: row.roastDate,
+          purchaseDate: row.purchaseDate,
+          priceCents: row.priceCents,
+          weightGrams: row.weightGrams,
+          rating: row.rating,
+          updatedAt: new Date(),
+        })
+        .where(eq(coffees.id, row.id))
+        .run();
+      if (result.changes > 0) saved += 1;
+    }
+  });
+  revalidatePath("/");
+  revalidatePath("/grid");
+  for (const row of rows) revalidatePath(`/coffees/${row.id}`);
+  return { saved, skipped: skipped > 0 ? skipped : undefined };
+}
+
 const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
 
 export async function importBeanconqueror(_prev: ImportState, formData: FormData): Promise<ImportState> {

@@ -18,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <small>the beans I buy</small>
             </Link>
             <nav style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <Link href="/grid" className="btn secondary">Grid</Link>
               <Link href="/import" className="btn secondary">Import</Link>
               <Link href="/new" className="btn">Add coffee</Link>
             </nav>
