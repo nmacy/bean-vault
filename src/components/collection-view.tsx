@@ -57,15 +57,28 @@ export default function CollectionView({ beans }: { beans: BeanItem[] }) {
               type="button"
               className={`view-switch-btn${view === "tiles" ? " active" : ""}`}
               onClick={() => setView("tiles")}
+              aria-label="Tiles view"
+              title="Tiles view"
             >
-              Tiles
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="3" width="7.5" height="7.5" rx="1.5" />
+                <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" />
+                <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" />
+                <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" />
+              </svg>
             </button>
             <button
               type="button"
               className={`view-switch-btn${view === "grid" ? " active" : ""}`}
               onClick={() => setView("grid")}
+              aria-label="Grid view"
+              title="Grid view"
             >
-              Grid
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="4" rx="1.5" />
+                <rect x="3" y="10" width="18" height="4" rx="1.5" />
+                <rect x="3" y="17" width="18" height="4" rx="1.5" />
+              </svg>
             </button>
           </div>
           <Link href="/new" className="btn">Add coffee</Link>

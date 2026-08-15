@@ -15,7 +15,6 @@ const GROUPS: { label: string; links: { href: string; label: string }[] }[] = [
   {
     label: "Actions",
     links: [
-      { href: "/new", label: "Add coffee" },
       { href: "/data", label: "Data — import / export" },
     ],
   },

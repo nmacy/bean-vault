@@ -1518,3 +1518,78 @@ button.clickable {
   color: var(--muted);
   text-align: center;
 }
+
+/* ---------- coffee view switch ---------- */
+
+.coffee-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.coffee-head h1 {
+  margin: 0;
+}
+
+.coffee-head-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.view-switch {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.view-switch-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 38px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.view-switch-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+
+.view-switch-btn + .view-switch-btn {
+  border-left: 1px solid var(--border);
+}
+
+.view-switch-btn:hover {
+  color: var(--ink);
+}
+
+.view-switch-btn.active {
+  background: var(--accent);
+  color: var(--btn-fg);
+}
+
+/* ---------- data page ---------- */
+
+.data-export {
+  margin-bottom: 10px;
+}
+
+.data-export-actions {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0 6px;
+  flex-wrap: wrap;
+}
