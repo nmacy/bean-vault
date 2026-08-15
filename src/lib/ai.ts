@@ -62,28 +62,58 @@ async function fetchPageText(url: string): Promise<string | null> {
   }
 }
 
-/** Pull the first JSON object out of a model reply (tolerates code fences/prose). */
+/** Pull the first JSON of a text (tolerates fences, prose, trailing garbage). */
 function extractJson(raw: string): unknown {
-  const fenced = raw.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+  const trimmed = raw.trim();
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenced) {
+    const text = fenced[1].trim();
+    if (text) {
+      try {
+        return JSON.parse(text);
+      } catch {
+        /* fall through to a balanced scan of the fence text */
+      }
+      const inner = scanBalancedObject(text);
+      if (inner !== null) return inner;
+    }
+  }
+  if (trimmed.startsWith("{")) {
     try {
-      return JSON.parse(fenced[1]);
+      return JSON.parse(trimmed);
     } catch {
       /* fall through */
     }
   }
-  try {
-    return JSON.parse(raw);
-  } catch {
-    /* fall through */
-  }
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    try {
-      return JSON.parse(raw.slice(start, end + 1));
-    } catch {
-      return null;
+  return scanBalancedObject(raw);
+}
+
+/** Scan for the first brace-balanced JSON object, honoring strings and escapes. */
+function scanBalancedObject(text: string): unknown {
+  const start = text.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth += 1;
+    else if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          return JSON.parse(text.slice(start, i + 1));
+        } catch {
+          return null;
+        }
+      }
     }
   }
   return null;
@@ -227,7 +257,7 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
       body: JSON.stringify({
         model: model,
         temperature: 0,
-        max_tokens: 1200,
+        max_tokens: 2000,
         response_format: { type: "json_object" },
         messages: [
           {
@@ -281,7 +311,11 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
   }
   const parsed = extractJson(content);
   if (parsed === null) {
-    return { ok: false, message: "The AI did not return usable JSON." };
+    const preview = content.replace(/\s+/g, " ").slice(0, 160);
+    return {
+      ok: false,
+      message: `The AI did not return usable JSON. Start of reply: "${preview}"`,
+    };
   }
   const fields = parseFields(parsed);
   // Deterministic fallbacks straight from the page text.
