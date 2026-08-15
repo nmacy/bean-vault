@@ -6,7 +6,7 @@ import type { Coffee } from "@/db/schema";
 import type { FormState } from "@/app/actions";
 
 const ROAST_LEVELS = ["light", "medium-light", "medium", "medium-dark", "dark"];
-const PROCESS_SUGGESTIONS = ["washed", "natural", "honey", "anaerobic", "carbonic maceration", "decaffeinated"];
+const PROCESS_SUGGESTIONS = ["washed", "natural", "honey", "anaerobic", "carbonic maceration"];
 
 type Props = {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
@@ -50,6 +50,13 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
             <datalist id="process-list">
               {PROCESS_SUGGESTIONS.map((p) => <option key={p} value={p} />)}
             </datalist>
+          </div>
+          <div className="field">
+            <label htmlFor="decaffeinated">Decaffeinated</label>
+            <label className="check-line">
+              <input id="decaffeinated" name="decaffeinated" type="checkbox" value="on" defaultChecked={coffee?.decaffeinated ?? false} />
+              This is a decaf roast
+            </label>
           </div>
           <div className="field">
             <label htmlFor="roastLevel">Roast level</label>
@@ -132,8 +139,12 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
             </div>
           ) : null}
           <div className="field wide">
+            <label htmlFor="tastingNotes">Tasting notes</label>
+            <textarea id="tastingNotes" name="tastingNotes" defaultValue={coffee?.tastingNotes ?? ""} placeholder="Sweet citrus, chocolate, syrupy body…" />
+          </div>
+          <div className="field wide">
             <label htmlFor="notes">Notes</label>
-            <textarea id="notes" name="notes" defaultValue={coffee?.notes ?? ""} placeholder="Tasting notes, brew recommendations, where you bought it…" />
+            <textarea id="notes" name="notes" defaultValue={coffee?.notes ?? ""} placeholder="Brew recommendations, where you bought it…" />
           </div>
         </div>
         <div className="form-actions">

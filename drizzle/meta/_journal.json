@@ -15,6 +15,13 @@
       "when": 1786803479678,
       "tag": "0001_big_nightmare",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786822895272,
+      "tag": "0002_awesome_guardian",
+      "breakpoints": true
     }
   ]
 }

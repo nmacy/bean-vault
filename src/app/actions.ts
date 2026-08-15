@@ -136,6 +136,8 @@ function collect(form: FormData) {
     weightGrams: intField(form, "weight", 1, 1_000_000),
     rating: intField(form, "rating", 1, 5),
     notes: text(form, "notes"),
+    tastingNotes: text(form, "tastingNotes"),
+    decaffeinated: form.get("decaffeinated") === "on",
   };
 }
 
@@ -166,6 +168,8 @@ export async function createCoffee(_prev: FormState, formData: FormData): Promis
       weightGrams: input.weightGrams,
       rating: input.rating,
       notes: input.notes,
+      tastingNotes: input.tastingNotes,
+      decaffeinated: input.decaffeinated,
       photoFile: photo,
       createdAt: now,
       updatedAt: now,
@@ -188,6 +192,8 @@ function fields(input: Collected) {
     weightGrams: input.weightGrams,
     rating: input.rating,
     notes: input.notes,
+    tastingNotes: input.tastingNotes,
+    decaffeinated: input.decaffeinated,
   };
 }
 

@@ -53,9 +53,17 @@ export default async function CoffeeDetailPage({ params }: { params: Promise<{ i
             {coffee.weightGrams != null ? <><dt>Weight</dt><dd>{coffee.weightGrams} g</dd></> : null}
           </dl>
 
+          {coffee.tastingNotes ? (
+            <div className="notes">
+              <div className="notes-title">Tasting notes</div>
+              {coffee.tastingNotes}
+            </div>
+          ) : null}
+
           {coffee.notes ? <div className="notes">{coffee.notes}</div> : null}
 
           <div className="tags">
+            {coffee.decaffeinated ? <span className="tag">Decaf</span> : null}
             <span className="tag">Added {coffee.createdAt.toLocaleDateString()}</span>
           </div>
 

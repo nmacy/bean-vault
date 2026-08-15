@@ -42,6 +42,7 @@ export default async function HomePage() {
                   <h3>{c.name}</h3>
                   <div className="roaster">{c.roaster}</div>
                   <div className="tags">
+                    {c.decaffeinated ? <span className="tag">Decaf</span> : null}
                     {c.origin ? <span className="tag">{c.origin}</span> : null}
                     {c.roastLevel ? <span className="tag">{cap(c.roastLevel)}</span> : null}
                     {c.process ? <span className="tag">{c.process}</span> : null}

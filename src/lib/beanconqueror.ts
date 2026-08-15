@@ -20,6 +20,8 @@ export type ImportedBean = {
   weightGrams: number | null;
   rating: number | null;
   notes: string | null;
+  tastingNotes: string | null;
+  decaffeinated: boolean;
   sourceUuid: string | null;
 };
 
@@ -116,19 +118,13 @@ export function parseBeanconqueror(text: string): BeanconquerorImport {
       .filter((o) => o.length > 0);
     const origin = [...new Set(entryOrigins)].join(", ") || null;
 
-    let process = joinUnique(...infos.map((i) => str(i.processing))) || null;
-    if (b.decaffeinated === true) {
-      const alreadyMentioned = process?.toLowerCase().includes("decaf") ?? false;
-      if (!alreadyMentioned) process = process ? `${process}, decaffeinated` : "decaffeinated";
-    }
+    const process = joinUnique(...infos.map((i) => str(i.processing))) || null;
 
     const variety = joinUnique(...infos.map((i) => str(i.variety))) || null;
 
     const notes: string[] = [];
     const note = str(b.note);
     if (note) notes.push(note);
-    const cuppingNotes = str((b.cupping as Record<string, unknown> | undefined)?.notes);
-    if (cuppingNotes) notes.push(cuppingNotes);
 
     // Blend composition, e.g. "60% Ethiopia, 40% Brazil".
     const blend = infos
@@ -168,6 +164,8 @@ export function parseBeanconqueror(text: string): BeanconquerorImport {
       weightGrams: weight !== null && weight > 0 ? weight : null,
       rating: rating !== null && rating >= 1 && rating <= 5 ? rating : null,
       notes: notes.length > 0 ? notes.join("\n") : null,
+      tastingNotes: str((b.cupping as Record<string, unknown> | undefined)?.notes),
+      decaffeinated: b.decaffeinated === true,
       sourceUuid: str(config?.uuid),
     });
   }
