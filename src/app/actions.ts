@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { coffees } from "@/db/schema";
+import { coffees, settings } from "@/db/schema";
 import { deletePhoto, downloadRemoteImage, savePhoto, savePhotoBytes } from "@/lib/photos";
 import { dateField, dollarsToCents, intField, photoFile as readPhoto, requiredText, text } from "@/lib/validation";
 import { parseBeanconqueror } from "@/lib/beanconqueror";
@@ -729,7 +729,33 @@ export type AiEnrichResult =
   | { ok: true; fields: AiCoffeeFields }
   | { ok: false; message: string };
 
+const SETTINGS_KEY = "openrouter_api_key";
+
+/** Stored in-app key first, environment variable as fallback. */
+export async function resolveAiKey(): Promise<string> {
+  const row = await db.select().from(settings).where(eq(settings.key, SETTINGS_KEY));
+  return row[0]?.value || process.env.OPENROUTER_API_KEY || "";
+}
+
 /** Fetch the product page server-side and ask the AI to fill coffee facts. */
 export async function aiEnrichProduct(url: string): Promise<AiEnrichResult> {
-  return enrichCoffeePage(url);
+  return enrichCoffeePage(url, await resolveAiKey());
+}
+
+export type SettingsState = { message?: string };
+
+/** Save or remove the OpenRouter API key in the app's settings table. */
+export async function saveApiKey(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  if (formData.get("remove") === "on") {
+    await db.delete(settings).where(eq(settings.key, SETTINGS_KEY));
+    return { message: "API key removed." };
+  }
+  const value = text(formData, "openrouterApiKey");
+  if (!value) return { message: "Enter a key, or use Remove." };
+  if (value.length < 10) return { message: "That key looks too short." };
+  await db
+    .insert(settings)
+    .values({ key: SETTINGS_KEY, value })
+    .onConflictDoUpdate({ target: settings.key, set: { value } });
+  return { message: "API key saved." };
 }

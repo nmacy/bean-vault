@@ -27,3 +27,9 @@ export const coffees = sqliteTable("coffees", {
 
 export type Coffee = typeof coffees.$inferSelect;
 export type NewCoffee = typeof coffees.$inferInsert;
+
+/** Tiny key/value store for app settings (e.g. the OpenRouter API key). */
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});

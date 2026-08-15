@@ -130,10 +130,9 @@ export type EnrichResult =
   | { ok: true; fields: AiCoffeeFields }
   | { ok: false; message: string };
 
-export async function enrichCoffeePage(url: string): Promise<EnrichResult> {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) {
-    return { ok: false, message: "OpenRouter API key is not configured (OPENROUTER_API_KEY)." };
+export async function enrichCoffeePage(url: string, apiKey: string): Promise<EnrichResult> {
+  if (!apiKey) {
+    return { ok: false, message: "OpenRouter API key is not configured." };
   }
 
   const text = await fetchPageText(url);
@@ -146,7 +145,7 @@ export async function enrichCoffeePage(url: string): Promise<EnrichResult> {
     res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${key}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://github.com/nmacy/coffee_tracker",
       },

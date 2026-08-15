@@ -193,12 +193,8 @@ prefills editable fields — country, region, process, roast level,
 blend/single-origin, decaf, tasting notes, and the product description as
 notes. This is an assisted draft; nothing is saved until you review.
 
-Setup: copy `.env.example` to `.env.local` and set your OpenRouter key:
-
-```bash
-cp .env.example .env.local   # then edit: OPENROUTER_API_KEY=sk-or-…
-```
-
-Optional `OPENROUTER_MODEL` overrides the default `openai/gpt-4o-mini`.
-The key is read server-side only and never sent to the browser. Without a
-key the button explains that the app is not configured.
+The key can be managed from the app itself: **Settings** (hamburger menu)
+saves it in the local settings table — server-side only, never sent to the
+browser and never included in exports. Alternatively set `OPENROUTER_API_KEY`
+in `.env.local` (see `.env.example`) as a fallback. Optional
+`OPENROUTER_MODEL` overrides the default `openai/gpt-4o-mini`.
