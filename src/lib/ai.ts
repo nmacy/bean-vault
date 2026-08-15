@@ -99,6 +99,23 @@ function agtronToRoast(n: number): string | null {
   return null;
 }
 
+/** "1,900–2,100 masl" (or ft) -> unit-less meters: "1,900–2,100". */
+function normalizeElevation(v: string): string | null {
+  const t = v.trim();
+  if (!t) return null;
+  const feet = /\b(ft|feet|foot)\b/i.test(t);
+  const nums = t.match(/\d[\d,.]*/g);
+  if (!nums) return null;
+  const converted: string[] = [];
+  for (const n of nums) {
+    const raw = Number(n.replace(/,/g, ""));
+    if (!Number.isFinite(raw)) continue;
+    const meters = feet ? Math.round(raw * 0.3048) : Math.round(raw);
+    converted.push(meters.toLocaleString("en-US"));
+  }
+  return converted.length > 0 ? converted.join("–") : null;
+}
+
 /** Best-effort elevation straight from page text ("1,900–2,100 masl"). */
 function findElevation(text: string): string | null {
   const m = text.match(
@@ -150,7 +167,7 @@ function parseFields(data: unknown): AiCoffeeFields {
     region: cleanString(rec.region),
     variety: cleanString(rec.variety),
     producer: cleanString(rec.producer),
-    elevation: cleanString(rec.elevation),
+    elevation: normalizeElevation(cleanString(rec.elevation) ?? ""),
     process: cleanString(rec.process),
     roastLevel,
     mix,
@@ -218,8 +235,8 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
             content:
               "You extract facts about a bag of coffee from a store product page. " +
               "Return ONLY a JSON object with these keys: country, region, variety, " +
-              "producer (grower or farm), elevation (copy the number and unit exactly " +
-              "as printed, e.g. \"1,900–2,100 masl\"), process, " +
+              "producer (grower or farm), elevation (numbers only, meters above sea " +
+              "level — convert feet if printed, e.g. \"1,900–2,100\"), process, " +
               "roastLevel (one of: light, medium-light, medium, medium-dark, dark), " +
               "agtron (the Agtron roast color number if listed, e.g. \"63\"), " +
               "mix (blend or single-origin), decaffeinated (boolean), tastingNotes, " +
@@ -268,7 +285,7 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
   }
   const fields = parseFields(parsed);
   // Deterministic fallbacks straight from the page text.
-  if (!fields.elevation) fields.elevation = findElevation(text);
+  if (!fields.elevation) fields.elevation = normalizeElevation(findElevation(text) ?? "");
   if (!fields.roastLevel) {
     const agtron = findAgtron(text);
     if (agtron !== null) fields.roastLevel = agtronToRoast(agtron);

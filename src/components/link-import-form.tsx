@@ -259,7 +259,7 @@ export default function LinkImportForm() {
             </div>
             <div className="field">
               <label htmlFor="link-elevation">Elevation</label>
-              <input id="link-elevation" name="elevation" value={elevation} onChange={(e) => setElevation(e.target.value)} placeholder="e.g. 1,900 m" />
+              <input id="link-elevation" name="elevation" value={elevation} onChange={(e) => setElevation(e.target.value)} placeholder="e.g. 1,900–2,100 (masl)" />
             </div>
             <div className="field">
               <label htmlFor="link-process">Process</label>
