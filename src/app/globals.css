@@ -105,7 +105,8 @@ img {
 }
 
 .header-inner {
-  max-width: 1080px;
+  /* Matches the widest page (.page-wide) so the header always spans the content. */
+  max-width: 1500px;
   margin: 0 auto;
   padding: 14px 24px;
   display: flex;
