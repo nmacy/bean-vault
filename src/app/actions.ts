@@ -7,8 +7,63 @@ import { db } from "@/db";
 import { coffees } from "@/db/schema";
 import { deletePhoto, savePhoto } from "@/lib/photos";
 import { dateField, dollarsToCents, intField, photoFile as readPhoto, requiredText, text } from "@/lib/validation";
+import { parseBeanconqueror } from "@/lib/beanconqueror";
 
 export type FormState = { message?: string };
+
+export type ImportState = {
+  message?: string;
+  imported?: number;
+  total?: number;
+  photosSkipped?: number;
+};
+
+const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
+
+export async function importBeanconqueror(_prev: ImportState, formData: FormData): Promise<ImportState> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { message: "Choose a Beanconqueror JSON export file." };
+  }
+  if (file.size > MAX_IMPORT_BYTES) {
+    return { message: "File is larger than 50 MB." };
+  }
+
+  let parsed;
+  try {
+    parsed = parseBeanconqueror(await file.text());
+  } catch (err) {
+    return { message: err instanceof Error ? err.message : "Could not parse this file." };
+  }
+
+  if (parsed.beans.length === 0) {
+    return { message: "No beans found in this export." };
+  }
+
+  const now = new Date();
+  let imported = 0;
+  for (let i = 0; i < parsed.beans.length; i += 100) {
+    const batch = parsed.beans.slice(i, i + 100).map((bean) => ({
+      ...bean,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    const inserted = await db
+      .insert(coffees)
+      .values(batch)
+      .onConflictDoNothing({ target: coffees.sourceUuid })
+      .returning({ id: coffees.id });
+    imported += inserted.length;
+  }
+
+  revalidatePath("/");
+  return {
+    message: "Import finished.",
+    imported,
+    total: parsed.beans.length,
+    photosSkipped: parsed.photoCount,
+  };
+}
 
 function collect(form: FormData) {
   return {

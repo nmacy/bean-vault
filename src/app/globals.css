@@ -416,6 +416,24 @@ img {
   font-size: 14px;
 }
 
+.import-ok {
+  background: #eef7ee;
+  border: 1px solid #bfe3c0;
+  color: #2e6b32;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.import-result p {
+  margin: 0 0 8px;
+}
+
+.import-result .btn {
+  margin-top: 8px;
+}
+
 .form-actions {
   display: flex;
   gap: 10px;

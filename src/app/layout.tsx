@@ -17,9 +17,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               Coffee Tracker
               <small>the beans I buy</small>
             </Link>
-            <Link href="/new" className="btn">
-              Add coffee
-            </Link>
+            <nav style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <Link href="/import" className="btn secondary">Import</Link>
+              <Link href="/new" className="btn">Add coffee</Link>
+            </nav>
           </div>
         </header>
         {children}

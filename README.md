@@ -2,7 +2,9 @@
 
 Track the coffee you buy: roaster, origin, variety, process, roast level, roast
 and purchase dates, price, weight, rating, notes — plus a photo snapshot of each
-bag.
+bag. Import your existing history from a Beanconqueror JSON export (Settings →
+Data & Storage → Export to JSON) via the **Import** page; re-importing is safe
+and skips already-imported beans.
 
 ## Stack
 
