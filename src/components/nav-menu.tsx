@@ -4,20 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const GROUPS: { label: string; links: { href: string; label: string }[] }[] = [
-  {
-    label: "Views",
-    links: [
-      { href: "/", label: "Dashboard" },
-      { href: "/coffees", label: "Coffees" },
-    ],
-  },
-  {
-    label: "Actions",
-    links: [
-      { href: "/settings", label: "Settings — data & AI" },
-    ],
-  },
+const LINKS = [
+  { href: "/", label: "Dashboard" },
+  { href: "/coffees", label: "Coffees" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export default function NavMenu() {
@@ -56,20 +46,15 @@ export default function NavMenu() {
       </button>
       {open ? (
         <div className="nav-panel">
-          {GROUPS.map((g) => (
-            <div key={g.label} className="nav-group">
-              <div className="nav-group-label">{g.label}</div>
-              {g.links.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className={`nav-link${pathname === l.href ? " active" : ""}`}
-                  onClick={() => setOpen(false)}
-                >
-                  {l.label}
-                </Link>
-              ))}
-            </div>
+          {LINKS.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className={`nav-link${pathname === l.href ? " active" : ""}`}
+              onClick={() => setOpen(false)}
+            >
+              {l.label}
+            </Link>
           ))}
         </div>
       ) : null}
