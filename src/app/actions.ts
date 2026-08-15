@@ -9,6 +9,10 @@ import { deletePhoto, downloadRemoteImage, savePhoto, savePhotoBytes } from "@/l
 import { dateField, dollarsToCents, intField, photoFile as readPhoto, requiredText, text } from "@/lib/validation";
 import { parseBeanconqueror } from "@/lib/beanconqueror";
 import { bestMatch, lookupProductPage, storeFor, storeProducts, type StoreProductDetail } from "@/lib/storefinder";
+import { parseCsv } from "@/lib/csv";
+import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
+import { existsSync } from "node:fs";
+import path from "node:path";
 
 export type FormState = { message?: string };
 
@@ -510,6 +514,145 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
     imported: created,
     total: created + updated,
     photosSkipped: photos,
+    skipped,
+  };
+}
+
+/* ---------- Bean Vault CSV import ---------- */
+
+const MAX_CSV_BYTES = 50 * 1024 * 1024;
+
+function csvCell(row: string[], index: number): string {
+  return index >= 0 && index < row.length ? row[index].trim() : "";
+}
+
+function csvNum(v: string): number | null {
+  if (v === "") return null;
+  const n = Number(v.replace(/[$,%\s]/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Import a Bean Vault CSV export. Rows with a valid id update that coffee,
+ * everything else inserts a new one (later rows win for duplicate ids).
+ * The photo column is only honoured when the file exists in uploads/.
+ */
+export async function importBeanVaultCsv(_prev: ImportState, formData: FormData): Promise<ImportState> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { message: "Choose a Bean Vault CSV file." };
+  }
+  if (file.size > MAX_CSV_BYTES) {
+    return { message: "CSV file is larger than 50 MB." };
+  }
+
+  const rows = parseCsv(await file.text());
+  if (rows.length < 2) return { message: "The CSV has no data rows." };
+
+  const header = rows[0].map((h) => h.trim().toLowerCase());
+  const idx = (name: string) => header.indexOf(name);
+  const col = {
+    id: idx("id"),
+    roaster: idx("roaster"),
+    name: idx("name"),
+    origin: idx("origin"),
+    variety: idx("variety"),
+    process: idx("process"),
+    roastLevel: idx("roast_level"),
+    roastDate: idx("roast_date"),
+    purchaseDate: idx("purchase_date"),
+    tastingNotes: idx("tasting_notes"),
+    notes: idx("notes"),
+    price: idx("price_usd"),
+    weight: idx("weight_grams"),
+    rating: idx("rating"),
+    decaf: idx("decaffeinated"),
+    photo: idx("photo"),
+  };
+  if (col.roaster < 0 || col.name < 0) {
+    return { message: "That CSV does not have roaster and name columns." };
+  }
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+  let photosMissing = 0;
+
+  for (const row of rows.slice(1)) {
+    const roaster = csvCell(row, col.roaster);
+    const name = csvCell(row, col.name);
+    if (!roaster || !name) {
+      skipped += 1;
+      continue;
+    }
+
+    const rawId = csvNum(csvCell(row, col.id));
+    const existingId =
+      rawId !== null && Number.isInteger(rawId) && rawId >= 1 && rawId <= 1_000_000_000 ? rawId : null;
+    const existing = existingId !== null ? await db.select().from(coffees).where(eq(coffees.id, existingId)) : [];
+
+    const decafValue = csvCell(row, col.decaf);
+    const decaffeinated = ["yes", "true", "1", "x"].includes(decafValue.toLowerCase());
+
+    let photoFile: string | null = null;
+    if (col.photo >= 0) {
+      const candidate = csvCell(row, col.photo);
+      if (isValidPhotoName(candidate) && existsSync(path.join(UPLOAD_DIR, candidate))) {
+        photoFile = candidate;
+      } else if (candidate) {
+        photosMissing += 1;
+      }
+    }
+
+    const values = {
+      roaster,
+      name,
+      origin: csvCell(row, col.origin) || null,
+      variety: csvCell(row, col.variety) || null,
+      process: csvCell(row, col.process) || null,
+      roastLevel: csvCell(row, col.roastLevel) || null,
+      roastDate: csvCell(row, col.roastDate) || null,
+      purchaseDate: csvCell(row, col.purchaseDate) || null,
+      tastingNotes: csvCell(row, col.tastingNotes) || null,
+      notes: csvCell(row, col.notes) || null,
+      rating: csvNum(csvCell(row, col.rating)),
+      decaffeinated,
+    };
+    const price = csvNum(csvCell(row, col.price));
+    const weight = csvNum(csvCell(row, col.weight));
+
+    if (existingId !== null && existing.length > 0) {
+      await db
+        .update(coffees)
+        .set({
+          ...values,
+          priceCents: price !== null ? Math.round(price * 100) : null,
+          weightGrams: weight !== null && weight > 0 ? Math.round(weight) : null,
+          photoFile: photoFile ?? existing[0].photoFile,
+          updatedAt: new Date(),
+        })
+        .where(eq(coffees.id, existingId));
+      updated += 1;
+    } else {
+      await db.insert(coffees).values({
+        ...values,
+        priceCents: price !== null ? Math.round(price * 100) : null,
+        weightGrams: weight !== null && weight > 0 ? Math.round(weight) : null,
+        photoFile,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      created += 1;
+    }
+  }
+
+  revalidatePath("/");
+  revalidatePath("/coffees");
+  return {
+    message: "CSV imported.",
+    imported: created,
+    total: created + updated,
+    photosSkipped: photosMissing,
     skipped,
   };
 }
