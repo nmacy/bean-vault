@@ -10,6 +10,60 @@
   --danger-bg: #fdf0ef;
   --radius: 10px;
   --shadow: 0 1px 3px rgb(45 35 30 / 8%);
+
+  /* theme-aware extras */
+  --btn-fg: #ffffff;
+  --danger-hover: #963a34;
+  --photo-bg: linear-gradient(135deg, #e9dccd, #d9c4ab);
+  --placeholder-fg: rgb(109 83 63 / 35%);
+  --stars: #c98a2d;
+  --input-bg: #ffffff;
+  --focus-ring: rgb(112 72 48 / 35%);
+  --danger-border: #eebcba;
+  --success-bg: #eef7ee;
+  --success-border: #bfe3c0;
+  --success-fg: #2e6b32;
+  --shadow-lg: 0 8px 24px rgb(45 35 30 / 16%);
+  --shadow-card: 0 4px 14px rgb(60 35 20 / 12%);
+  --hover-tint: #f8f1e8;
+  --thead-bg: #f4ede3;
+  --row-border: #f1e8dc;
+  --dirty-row: #fdf6e3;
+  --dirty-cell: #fbeac2;
+  --warn-fg: #9a7b1f;
+}
+
+html.dark {
+  --bg: #17120f;
+  --surface: #241b16;
+  --ink: #f6f1e7;
+  --muted: #d8b89c;
+  --accent: #a47148;
+  --accent-dark: #c08a5a;
+  --border: #3a2d22;
+  --danger: #d1635f;
+  --danger-bg: #3a2321;
+  --shadow: 0 1px 3px rgb(0 0 0 / 40%);
+
+  --btn-fg: #f6f1e7;
+  --danger-hover: #a04741;
+  --photo-bg: linear-gradient(135deg, #201711, #2b1f16);
+  --placeholder-fg: rgb(214 184 156 / 28%);
+  --stars: #d9a05c;
+  --input-bg: #2b2119;
+  --focus-ring: rgb(192 138 90 / 50%);
+  --danger-border: #8a4a45;
+  --success-bg: #24301d;
+  --success-border: #3c5c33;
+  --success-fg: #a8d5a3;
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 50%);
+  --shadow-card: 0 4px 14px rgb(0 0 0 / 45%);
+  --hover-tint: #33281f;
+  --thead-bg: #2c211a;
+  --row-border: #32261e;
+  --dirty-row: #362b1c;
+  --dirty-cell: #4a3a20;
+  --warn-fg: #d9b45a;
 }
 
 * {
@@ -100,7 +154,7 @@ img {
   border-radius: 8px;
   border: 1px solid transparent;
   background: var(--accent);
-  color: #fff;
+  color: var(--btn-fg);
   font: inherit;
   font-weight: 600;
   font-size: 14px;
@@ -127,7 +181,7 @@ img {
 }
 
 .btn.danger:hover {
-  background: #963a34;
+  background: var(--danger-hover);
 }
 
 .btn:disabled {
@@ -154,13 +208,13 @@ img {
 
 .card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 14px rgb(60 35 20 / 12%);
+  box-shadow: var(--shadow-card);
 }
 
 .card-photo {
   aspect-ratio: 4 / 3;
   overflow: hidden;
-  background: linear-gradient(135deg, #e9dccd, #d9c4ab);
+  background: var(--photo-bg);
 }
 
 .card-photo img {
@@ -177,7 +231,7 @@ img {
   justify-content: center;
   font-size: 44px;
   font-weight: 800;
-  color: rgb(109 83 63 / 35%);
+  color: var(--placeholder-fg);
 }
 
 .card-body {
@@ -221,7 +275,7 @@ img {
 }
 
 .stars {
-  color: #c98a2d;
+  color: var(--stars);
   letter-spacing: 1px;
   font-size: 14px;
   white-space: nowrap;
@@ -257,7 +311,7 @@ img {
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
-  background: linear-gradient(135deg, #e9dccd, #d9c4ab);
+  background: var(--photo-bg);
 }
 
 .detail-photo img {
@@ -273,7 +327,7 @@ img {
   justify-content: center;
   font-size: 72px;
   font-weight: 800;
-  color: rgba(109 83 63 / 35%);
+  color: var(--placeholder-fg);
 }
 
 .detail h1 {
@@ -289,7 +343,7 @@ img {
 
 .detail .stars-lg {
   font-size: 22px;
-  color: #c98a2d;
+  color: var(--stars);
   letter-spacing: 2px;
 }
 
@@ -410,7 +464,7 @@ img {
   padding: 9px 11px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--input-bg);
   color: var(--ink);
   width: 100%;
 }
@@ -418,7 +472,7 @@ img {
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  outline: 2px solid rgb(112 72 48 / 35%);
+  outline: 2px solid var(--focus-ring);
   border-color: var(--accent);
 }
 
@@ -429,7 +483,7 @@ img {
 
 .form-error {
   background: var(--danger-bg);
-  border: 1px solid #eebcba;
+  border: 1px solid var(--danger-border);
   color: var(--danger);
   border-radius: 8px;
   padding: 10px 14px;
@@ -438,9 +492,9 @@ img {
 }
 
 .import-ok {
-  background: #eef7ee;
-  border: 1px solid #bfe3c0;
-  color: #2e6b32;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-fg);
   border-radius: 8px;
   padding: 10px 14px;
   margin-bottom: 16px;
@@ -535,7 +589,7 @@ img {
 }
 
 .filter-search:focus {
-  outline: 2px solid rgb(112 72 48 / 35%);
+  outline: 2px solid var(--focus-ring);
   border-color: var(--accent);
 }
 
@@ -585,7 +639,7 @@ img {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgb(45 35 30 / 16%);
+  box-shadow: var(--shadow-lg);
   padding: 8px;
   min-width: 190px;
   display: grid;
@@ -705,7 +759,7 @@ img {
 
 .variant-option.selected {
   border-color: var(--accent);
-  background: #f8f1e8;
+  background: var(--hover-tint);
   box-shadow: 0 0 0 1px var(--accent) inset;
 }
 
@@ -773,7 +827,7 @@ img {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgb(45 35 30 / 16%);
+  box-shadow: var(--shadow-lg);
   padding: 6px;
   display: grid;
   gap: 2px;
@@ -832,13 +886,13 @@ img {
 
 .status-chip.saving,
 .status-chip.finding {
-  background: #f4ede3;
+  background: var(--thead-bg);
   color: var(--muted);
 }
 
 .status-chip.saved {
-  background: #eef7ee;
-  color: #2e6b32;
+  background: var(--success-bg);
+  color: var(--success-fg);
 }
 
 .status-chip.error {
@@ -859,13 +913,13 @@ img {
 }
 
 .grid-saved {
-  color: #2e6b32;
+  color: var(--success-fg);
   font-weight: 600;
   font-size: 14px;
 }
 
 .grid-hint {
-  color: #9a7b1f;
+  color: var(--warn-fg);
   font-size: 13.5px;
 }
 
@@ -890,7 +944,7 @@ img {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #f4ede3;
+  background: var(--thead-bg);
   color: var(--muted);
   font-size: 11.5px;
   font-weight: 700;
@@ -904,7 +958,7 @@ img {
 
 .grid-table tbody td {
   padding: 2px 8px 2px 4px;
-  border-bottom: 1px solid #f1e8dc;
+  border-bottom: 1px solid var(--row-border);
   vertical-align: middle;
   white-space: nowrap;
 }
@@ -914,7 +968,7 @@ img {
 }
 
 .grid-table tbody tr.row-dirty td {
-  background: #fdf6e3;
+  background: var(--dirty-row);
 }
 
 .grid-table td.num {
@@ -945,13 +999,13 @@ img {
 
 .grid-table input:focus,
 .grid-table select:focus {
-  outline: 2px solid rgb(112 72 48 / 40%);
+  outline: 2px solid var(--focus-ring);
   border-color: var(--accent);
-  background: #fff;
+  background: var(--input-bg);
 }
 
 .cell-dirty {
-  background: #fbeac2 !important;
+  background: var(--dirty-cell) !important;
 }
 
 .col-photo {
@@ -970,4 +1024,43 @@ img {
 .grid-link {
   font-size: 12px;
   color: var(--accent);
+}
+/* ---------- dark mode ---------- */
+
+html.dark .brand-mark {
+  /* Cream background becomes dark, dark-espresso logo becomes cream —
+     the "inverted outline" treatment so the mark stays visible. */
+  filter: invert(0.9) hue-rotate(180deg);
+}
+
+body {
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  background: var(--hover-tint);
+}
+
+.theme-toggle svg {
+  width: 19px;
+  height: 19px;
+  fill: currentColor;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }

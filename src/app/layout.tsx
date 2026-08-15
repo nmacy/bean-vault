@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import NavMenu from "@/components/nav-menu";
+import ThemeToggle from "@/components/theme-toggle";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,16 +9,25 @@ export const metadata: Metadata = {
   description: "Track the coffee you buy: roaster, origin, roast, price, and a snapshot.",
 };
 
+// Applied before first paint to avoid a light-mode flash for dark users.
+const THEME_BOOTSTRAP = `(function(){try{var s=localStorage.getItem('bean-vault:theme');var dark=s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(dark)document.documentElement.classList.add('dark')}catch(e){}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+      </head>
       <body>
         <header className="site-header">
           <div className="header-inner">
             <Link href="/" className="brand">
               <img src="/bean-vault-header.png" alt="Bean Vault" className="brand-mark" />
             </Link>
-            <NavMenu />
+            <div className="header-actions">
+              <ThemeToggle />
+              <NavMenu />
+            </div>
           </div>
         </header>
         {children}
