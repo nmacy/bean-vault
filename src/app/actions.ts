@@ -5,10 +5,10 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { coffees } from "@/db/schema";
-import { deletePhoto, savePhoto, savePhotoBytes } from "@/lib/photos";
+import { deletePhoto, downloadRemoteImage, savePhoto, savePhotoBytes } from "@/lib/photos";
 import { dateField, dollarsToCents, intField, photoFile as readPhoto, requiredText, text } from "@/lib/validation";
 import { parseBeanconqueror } from "@/lib/beanconqueror";
-import { bestMatch, storeFor, storeProducts } from "@/lib/storefinder";
+import { bestMatch, lookupProductPage, storeFor, storeProducts, type StoreProductDetail } from "@/lib/storefinder";
 
 export type FormState = { message?: string };
 
@@ -249,38 +249,6 @@ export async function deleteCoffee(id: number): Promise<void> {
 export type FindPhotoResult =
   | { ok: true; photoFile: string }
   | { ok: false; message: string };
-
-const DOWNLOAD_TIMEOUT_MS = 20_000;
-const MAX_DOWNLOAD_BYTES = 12 * 1024 * 1024;
-
-const MIME_EXT: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/jpg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/gif": "gif",
-  "image/avif": "avif",
-};
-
-async function downloadImage(url: string): Promise<{ data: Uint8Array; ext: string } | null> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), DOWNLOAD_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { redirect: "follow", signal: ctrl.signal });
-    if (!res.ok) return null;
-    const contentType = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-    const buffer = new Uint8Array(await res.arrayBuffer());
-    if (buffer.length === 0 || buffer.length > MAX_DOWNLOAD_BYTES) return null;
-    const urlExt = url.match(/\.(jpe?g|png|webp|gif|avif)(?:[?#]|$)/i)?.[1].toLowerCase().replace("jpeg", "jpg");
-    const resolvedExt = MIME_EXT[contentType] ?? urlExt;
-    return resolvedExt ? { data: buffer, ext: resolvedExt } : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 /**
  * Find the store page for this coffee (Shopify /products.json or WooCommerce
  * REST feed), match the bag by fuzzy product-title comparison, and save that
@@ -302,7 +270,7 @@ export async function findCoffeePhoto(id: number): Promise<FindPhotoResult> {
     return { ok: false, message: `No product matched "${coffee.name}".` };
   }
 
-  const image = await downloadImage(match.imageUrl);
+  const image = await downloadRemoteImage(match.imageUrl);
   if (!image) return { ok: false, message: "Could not download the product image." };
 
   let photoFile: string;
@@ -317,4 +285,67 @@ export async function findCoffeePhoto(id: number): Promise<FindPhotoResult> {
   revalidatePath("/grid");
   revalidatePath(`/coffees/${id}`);
   return { ok: true, photoFile };
+}
+/* ---------- add by store link ---------- */
+
+export type LinkLookupResult =
+  | { ok: true; url: string; product: StoreProductDetail }
+  | { ok: false; message: string };
+
+/** Resolve a store product URL to product + purchase options (bag sizes). */
+export async function lookupProductLink(url: string): Promise<LinkLookupResult> {
+  const result = await lookupProductPage(url);
+  if ("error" in result) return { ok: false, message: result.error };
+  return { ok: true, url, product: result };
+}
+
+export async function createCoffeeFromLink(_prev: FormState, formData: FormData): Promise<FormState> {
+  const url = requiredText(formData, "url");
+  const variantIndex = intField(formData, "variantIndex", 0, 1000);
+  if (!url || variantIndex === null) return { message: "Missing product link or bag choice." };
+
+  // Re-resolve the product server-side (authoritative; the client only offers choices).
+  const page = await lookupProductPage(url);
+  if ("error" in page) return { message: page.error };
+  const variant = page.variants[variantIndex];
+  if (!variant) return { message: "That bag option is not available." };
+
+  const nameOverride = text(formData, "name");
+  const priceOverride = dollarsToCents(formData, "price");
+  const weightOverride = intField(formData, "weight", 1, 1_000_000);
+  const roaster = requiredText(formData, "roaster") ?? page.roaster;
+  const name = nameOverride ?? page.name;
+  if (!name) return { message: "Coffee name is required." };
+  if (!roaster) return { message: "Roaster is required." };
+
+  let photoFile: string | null = null;
+  if (page.imageUrl) {
+    const image = await downloadRemoteImage(page.imageUrl);
+    if (image) {
+      try {
+        photoFile = await savePhotoBytes(image.data, image.ext);
+      } catch {
+        photoFile = null;
+      }
+    }
+  }
+
+  const now = new Date();
+  const [row] = await db
+    .insert(coffees)
+    .values({
+      roaster,
+      name,
+      priceCents: priceOverride ?? variant.priceCents ?? null,
+      weightGrams: weightOverride ?? variant.weightGrams ?? null,
+      notes: text(formData, "notes"),
+      photoFile,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
+
+  revalidatePath("/");
+  revalidatePath("/grid");
+  redirect(`/coffees/${row.id}`);
 }

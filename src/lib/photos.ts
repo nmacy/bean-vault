@@ -38,6 +38,38 @@ export async function savePhoto(file: File): Promise<string> {
   return savePhotoBytes(Buffer.from(await file.arrayBuffer()), ext);
 }
 
+const DOWNLOAD_TIMEOUT_MS = 20_000;
+const MAX_DOWNLOAD_BYTES = 12 * 1024 * 1024;
+
+const MIME_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/avif": "avif",
+};
+
+/** Download an image URL, validate it, and return bytes + extension. */
+export async function downloadRemoteImage(url: string): Promise<{ data: Uint8Array; ext: string } | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), DOWNLOAD_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { redirect: "follow", signal: ctrl.signal });
+    if (!res.ok) return null;
+    const contentType = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    const buffer = new Uint8Array(await res.arrayBuffer());
+    if (buffer.length === 0 || buffer.length > MAX_DOWNLOAD_BYTES) return null;
+    const urlExt = url.match(/\.(jpe?g|png|webp|gif|avif)(?:[?#]|$)/i)?.[1].toLowerCase().replace("jpeg", "jpg");
+    const resolvedExt = MIME_EXT[contentType] ?? urlExt;
+    return resolvedExt ? { data: buffer, ext: resolvedExt } : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function deletePhoto(name: string | null): Promise<void> {
   if (!name) return;
   if (!isValidPhotoName(name)) return;
