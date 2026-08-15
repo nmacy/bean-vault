@@ -1690,6 +1690,13 @@ button.clickable {
   margin-bottom: 24px;
 }
 
+/* consistent rhythm between stacked settings cards */
+.settings-section + .form-card,
+.form-card + .settings-section,
+.form-card + .form-card {
+  margin-top: 24px;
+}
+
 /* ---------- AI feedback ---------- */
 
 .tag-ai {
