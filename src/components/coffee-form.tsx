@@ -79,10 +79,18 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
               <option value="blend">Blend</option>
             </select>
           </div>
-          <div className="field">
-            <label htmlFor="variety">Variety</label>
-            <input id="variety" name="variety" defaultValue={coffee?.variety ?? ""} placeholder="e.g. Gesha, Bourbon" maxLength={120} />
-          </div>
+<div className="field">
+              <label htmlFor="variety">Variety</label>
+              <input id="variety" name="variety" defaultValue={coffee?.variety ?? ""} placeholder="e.g. Gesha, Bourbon" maxLength={120} />
+            </div>
+            <div className="field">
+              <label htmlFor="producer">Producer</label>
+              <input id="producer" name="producer" defaultValue={coffee?.producer ?? ""} placeholder="Farm or grower" maxLength={120} />
+            </div>
+            <div className="field">
+              <label htmlFor="elevation">Elevation</label>
+              <input id="elevation" name="elevation" defaultValue={coffee?.elevation ?? ""} placeholder="e.g. 1,900–2,100 (masl)" maxLength={40} onKeyDown={elevationKeyguard} onPaste={elevationPaste} />
+            </div>
           <div className="field">
             <label htmlFor="process">Process</label>
             <input id="process" name="process" list="process-list" defaultValue={coffee?.process ?? ""} placeholder="e.g. washed" maxLength={80} />
