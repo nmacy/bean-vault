@@ -167,9 +167,14 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
             </div>
           ) : photoHref ? (
             <div className="field wide">
+              {removePhoto ? <input type="hidden" name="removePhoto" value="on" /> : null}
               <span className="hint">Current photo:</span>
               <div className="current-photo">
-                <img src={photoHref} alt="Current photo" />
+                {removePhoto ? (
+                  <span className="current-photo-removed">Photo will be removed.</span>
+                ) : (
+                  <img src={photoHref} alt="Current photo" />
+                )}
                 <label className="check-line">
                   <input
                     type="checkbox"
