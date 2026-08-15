@@ -56,17 +56,16 @@ npm start
 
 ## Docker (homelab)
 
-Published image: `ghcr.io/nmacy/coffee-tracker:latest` (linux/amd64, ~90 MB).
-(The GitHub repo and container image keep the original technical
-`coffee-tracker` name; the product name is Bean Vault.)
+Published image: `ghcr.io/nmacy/bean-vault:latest` (linux/amd64, ~90 MB).
+Source: <https://github.com/nmacy/bean-vault>.
 
 Run on a Debian x64 box with Docker:
 
 ```sh
-docker run -d --name coffee-tracker -p 3000:3000 \
-  -v coffee-tracker-data:/app/data \
+docker run -d --name bean-vault -p 3000:3000 \
+  -v bean-vault-data:/app/data \
   --restart unless-stopped \
-  ghcr.io/nmacy/coffee-tracker:latest
+  ghcr.io/nmacy/bean-vault:latest
 ```
 
 Or just `docker compose up -d` (see `docker-compose.yml`).
@@ -74,8 +73,8 @@ Or just `docker compose up -d` (see `docker-compose.yml`).
 Rebuild and publish from any host:
 
 ```bash
-docker buildx build --platform linux/amd64 -t ghcr.io/nmacy/coffee-tracker:latest .
-docker push ghcr.io/nmacy/coffee-tracker:latest
+docker buildx build --platform linux/amd64 -t ghcr.io/nmacy/bean-vault:latest .
+docker push ghcr.io/nmacy/bean-vault:latest
 ```
 
 Notes:
@@ -83,11 +82,15 @@ Notes:
 - The image runs as a non-root `node` user and listens on `:3000`.
 - **All persistence is the `/app/data` volume** — SQLite DB (auto-migrated on
   first start) plus uploaded photos. Back up the volume, not the container.
-- ghcr packages default to **private**. For a passwordless `docker pull` on the
-  lab, set the package public (GitHub → your profile → Packages → Coffee
-  Tracker → Package settings → Danger Zone → Change visibility). Otherwise
+- ghcr packages default to **private**. For a passwordless `docker pull` on
+  the lab, set the package public (GitHub → your profile → Packages → Bean
+  Vault → Package settings → Danger Zone → Change visibility). Otherwise
   authenticate on the lab instead: `echo $PAT | docker login ghcr.io -u
   <user> --password-stdin` with a PAT that has `read:packages`.
+- **Config**: the OpenRouter key/model can be set in-app (Settings, stored in
+  the data volume) or via environment variables. `docker-compose.yml` passes
+  `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` / `TZ` through from `.env`
+  (copy `.env.example`) and mounts the persistent `bean-vault-data` volume.
 
 ## Importing from Beanconqueror
 

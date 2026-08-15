@@ -1,11 +1,21 @@
 services:
-  coffee-tracker:
-    image: ghcr.io/nmacy/coffee-tracker:latest
+  bean-vault:
+    image: ghcr.io/nmacy/bean-vault:latest
+    container_name: bean-vault
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      # Host port is configurable: set BEAN_VAULT_PORT=8080 in .env
+      - "${BEAN_VAULT_PORT:-3000}:3000"
+    environment:
+      # Optional. The app can also store the key/model in Settings (preferred);
+      # these env values are the fallback. Values come from a .env file next to
+      # this compose file (copy .env.example) or the host environment.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      TZ: ${TZ:-UTC}
     volumes:
-      - coffee-tracker-data:/app/data
+      # Everything persistent: SQLite DB + uploaded photos.
+      - bean-vault-data:/app/data
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -14,4 +24,4 @@ services:
       start_period: 20s
 
 volumes:
-  coffee-tracker-data:
+  bean-vault-data:
