@@ -4,14 +4,29 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const LINKS = [
-  { href: "/", label: "All coffees" },
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/grid", label: "Edit grid" },
-  { href: "/import", label: "Import" },
-  { href: "/new", label: "Add coffee" },
-  { href: "/api/export", label: "Export CSV" },
-  { href: "/api/export/json", label: "Backup (with photos)" },
+const GROUPS: { label: string; links: { href: string; label: string }[] }[] = [
+  {
+    label: "Views",
+    links: [
+      { href: "/", label: "Dashboard" },
+      { href: "/coffees", label: "All coffees" },
+      { href: "/grid", label: "Grid" },
+    ],
+  },
+  {
+    label: "Actions",
+    links: [
+      { href: "/new", label: "Add coffee" },
+      { href: "/import", label: "Import" },
+    ],
+  },
+  {
+    label: "Data",
+    links: [
+      { href: "/api/export", label: "Export CSV" },
+      { href: "/api/export/json", label: "Backup (with photos)" },
+    ],
+  },
 ];
 
 export default function NavMenu() {
@@ -50,15 +65,20 @@ export default function NavMenu() {
       </button>
       {open ? (
         <div className="nav-panel">
-          {LINKS.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={`nav-link${pathname === l.href ? " active" : ""}`}
-              onClick={() => setOpen(false)}
-            >
-              {l.label}
-            </Link>
+          {GROUPS.map((g) => (
+            <div key={g.label} className="nav-group">
+              <div className="nav-group-label">{g.label}</div>
+              {g.links.map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className={`nav-link${pathname === l.href ? " active" : ""}`}
+                  onClick={() => setOpen(false)}
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </div>
           ))}
         </div>
       ) : null}

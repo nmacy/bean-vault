@@ -30,14 +30,14 @@ export default async function GridPage() {
 
   return (
     <main className="page page-wide">
-      <Link href="/" className="back-link">← Back to all coffees</Link>
+      <Link href="/coffees" className="back-link">← Back to all coffees</Link>
       <div className="page-head">
         <h1>Edit all ({all.length})</h1>
-        <Link href="/" className="btn secondary">View cards</Link>
+        <Link href="/coffees" className="btn secondary">View cards</Link>
       </div>
       <p className="grid-intro">
-        Edit any cell — changes save automatically when you leave the cell.
-        Click column headers to sort; use the filters to narrow the list.
+        Browse every bag here; click <strong>Edit</strong> to change cells (edits save
+        automatically as you leave each one). Column headers sort; the filters narrow the list.
       </p>
       <GridEditor beans={all.map((b) => ({ ...b }))} />
     </main>

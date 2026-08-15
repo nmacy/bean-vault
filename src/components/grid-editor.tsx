@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { saveGrid, findCoffeePhoto, type GridRow } from "@/app/actions";
+import { formatCents } from "@/lib/format";
 
 type Cell = {
   roaster: string;
@@ -143,6 +144,7 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
   const [filters, setFilters] = useState({ search: "", roaster: "", roast: "", rating: "", year: "", decaf: "" });
   const [visibleCols, setVisibleCols] = useState<string[]>(readStoredColumns);
+  const [editing, setEditing] = useState(false);
 
   const rowsRef = useRef(rows);
   const draftsRef = useRef(drafts);
@@ -440,6 +442,12 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
     setBatchMsg(msg);
   }
 
+  async function finishEditing() {
+    const withDrafts = Object.keys(draftsRef.current).map(Number);
+    await Promise.all(withDrafts.map((id) => saveRow(id)));
+    setEditing(false);
+  }
+
   /* ---------- cell rendering ---------- */
 
   function renderCell(row: BaseRow, key: string) {
@@ -522,7 +530,28 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
     }
   }
 
-return (
+function renderReadCell(row: BaseRow, key: string) {
+    const text = (v: string) => (
+      <td><span className="cell-text">{v || <span className="cell-none">—</span>}</span></td>
+    );
+    switch (key) {
+      case "roaster": return text(row.roaster);
+      case "name": return <td className="cell-name"><span className="cell-text">{row.name}</span></td>;
+      case "origin": return text(row.origin ?? "");
+      case "variety": return text(row.variety ?? "");
+      case "process": return text(row.process ?? "");
+      case "roastLevel": return text(row.roastLevel ?? "");
+      case "roastDate": return text(row.roastDate ?? "");
+      case "purchaseDate": return text(row.purchaseDate ?? "");
+      case "price": return <td className="num">{row.priceCents != null ? formatCents(row.priceCents) : <span className="cell-none">—</span>}</td>;
+      case "weight": return <td className="num">{row.weightGrams != null ? `${row.weightGrams} g` : <span className="cell-none">—</span>}</td>;
+      case "rating": return <td>{row.rating != null ? <span className="stars">{"★".repeat(row.rating)}</span> : <span className="cell-none">—</span>}</td>;
+      case "decaf": return <td className="col-decaf">{row.decaffeinated ? "✓" : <span className="cell-none">—</span>}</td>;
+      default: return null;
+    }
+  }
+
+  return (
     <>
       <div className="grid-toolbar">
         <input
@@ -560,7 +589,11 @@ return (
         ) : null}
         <span className="filter-count">{visible.length} of {rows.length}</span>
         {batchMsg ? <span className="grid-saved">{batchMsg}</span> : null}
-        <span className="grid-hint">Edits save automatically when you leave a cell.</span>
+        {editing ? (
+          <span className="grid-hint">Edits save automatically when you leave a cell.</span>
+        ) : (
+          <span className="grid-hint">View mode — click Edit to change cells.</span>
+        )}
         <span className="toolbar-spacer" />
         <details className="columns-menu">
           <summary className="btn btn-small btn-secondary columns-toggle">Columns</summary>
@@ -577,14 +610,29 @@ return (
             ))}
           </div>
         </details>
-        <button
-          type="button"
-          className="btn btn-small"
-          onClick={() => void findMissingPhotos()}
-          disabled={batchCount === 0}
-        >
-          Find photos for {batchCount} missing
-        </button>
+        {editing ? (
+          <>
+            <button
+              type="button"
+              className="btn btn-small"
+              onClick={() => void finishEditing()}
+            >
+              Done
+            </button>
+            <button
+              type="button"
+              className="btn btn-small"
+              onClick={() => void findMissingPhotos()}
+              disabled={batchCount === 0}
+            >
+              Find photos for {batchCount} missing
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn btn-small" onClick={() => setEditing(true)}>
+            Edit
+          </button>
+        )}
       </div>
 
       <div className="table-scroll">
@@ -610,7 +658,7 @@ return (
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={2 + visibleCols.length} className="grid-empty">No coffees match the filters.</td>
+                <td colSpan={1 + visibleCols.length + (editing ? 1 : 0)} className="grid-empty">No coffees match the filters.</td>
               </tr>
             ) : null}
             {visible.map(({ row }) => {
@@ -622,7 +670,7 @@ return (
                       <Link href={`/coffees/${row.id}`}>
                         <img src={`/api/photos/${row.photoFile}`} alt="" className="grid-thumb" />
                       </Link>
-                    ) : (
+                    ) : editing ? (
                       <button
                         type="button"
                         className="btn btn-small btn-secondary"
@@ -631,18 +679,24 @@ return (
                       >
                         {status?.kind === "finding" ? "…" : "Find"}
                       </button>
+                    ) : (
+                      <span className="cell-none">—</span>
                     )}
                   </td>
                   {COLUMNS.filter((c) => visibleCols.includes(c.key)).map((c) => (
-                    <Fragment key={c.key}>{renderCell(row, c.key)}</Fragment>
+                    <Fragment key={c.key}>
+                      {editing ? renderCell(row, c.key) : renderReadCell(row, c.key)}
+                    </Fragment>
                   ))}
-                  <td className="col-status">
-                    {status ? (
-                      <span className={`status-chip ${status.kind}`}>
-                        {status.kind === "saving" ? "saving…" : status.kind === "saved" ? "saved" : status.msg ?? "error"}
-                      </span>
-                    ) : null}
-                  </td>
+                  {editing ? (
+                    <td className="col-status">
+                      {status ? (
+                        <span className={`status-chip ${status.kind}`}>
+                          {status.kind === "saving" ? "saving…" : status.kind === "saved" ? "saved" : status.msg ?? "error"}
+                        </span>
+                      ) : null}
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}

@@ -134,7 +134,7 @@ export default function LinkImportForm() {
             <button type="submit" className="btn" disabled={isPending}>
               {isPending ? "Saving…" : "Save coffee"}
             </button>
-            <Link href="/" className="btn secondary">Cancel</Link>
+            <Link href="/coffees" className="btn secondary">Cancel</Link>
           </div>
         </form>
       ) : null}

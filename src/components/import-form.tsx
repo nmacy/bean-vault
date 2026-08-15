@@ -30,7 +30,7 @@ export default function ImportForm() {
                 them, so they cannot be recovered.
               </p>
             ) : null}
-            <Link href="/" className="btn">View your coffees</Link>
+            <Link href="/coffees" className="btn">View your coffees</Link>
           </div>
         ) : null}
 
@@ -48,7 +48,7 @@ export default function ImportForm() {
             <button type="submit" className="btn" disabled={isPending}>
               {isPending ? "Importing…" : "Import beans"}
             </button>
-            <Link href="/" className="btn secondary">Cancel</Link>
+            <Link href="/coffees" className="btn secondary">Cancel</Link>
           </div>
         </form>
       </div>
@@ -74,7 +74,7 @@ export default function ImportForm() {
                 with their coffees.
               </p>
             ) : null}
-            <Link href="/" className="btn">View your coffees</Link>
+            <Link href="/coffees" className="btn">View your coffees</Link>
           </div>
         ) : null}
 

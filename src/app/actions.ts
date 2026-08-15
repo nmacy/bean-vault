@@ -72,7 +72,7 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
       if (result.changes > 0) saved += 1;
     }
   });
-  revalidatePath("/");
+  revalidatePath("/"); revalidatePath("/coffees");
   revalidatePath("/grid");
   for (const row of rows) revalidatePath(`/coffees/${row.id}`);
   return { saved, skipped: skipped > 0 ? skipped : undefined };
@@ -116,7 +116,7 @@ export async function importBeanconqueror(_prev: ImportState, formData: FormData
     imported += inserted.length;
   }
 
-  revalidatePath("/");
+  revalidatePath("/"); revalidatePath("/coffees");
   return {
     message: "Import finished.",
     imported,
@@ -179,7 +179,7 @@ export async function createCoffee(_prev: FormState, formData: FormData): Promis
     })
     .returning();
 
-  revalidatePath("/");
+  revalidatePath("/"); revalidatePath("/coffees");
   redirect(`/coffees/${row.id}`);
 }
 
@@ -230,7 +230,7 @@ export async function updateCoffee(id: number, _prev: FormState, formData: FormD
     })
     .where(eq(coffees.id, id));
 
-  revalidatePath("/");
+  revalidatePath("/"); revalidatePath("/coffees");
   revalidatePath(`/coffees/${id}`);
   revalidatePath(`/coffees/${id}/edit`);
   redirect(`/coffees/${id}`);
@@ -241,8 +241,8 @@ export async function deleteCoffee(id: number): Promise<void> {
   if (!existing) return;
   await db.delete(coffees).where(eq(coffees.id, id));
   await deletePhoto(existing.photoFile);
-  revalidatePath("/");
-  redirect("/");
+  revalidatePath("/"); revalidatePath("/coffees");
+  redirect("/coffees");
 }
 
 /* ---------- auto photo lookup (roaster storefront) ---------- */
@@ -282,7 +282,7 @@ export async function findCoffeePhoto(id: number): Promise<FindPhotoResult> {
   }
 
   await db.update(coffees).set({ photoFile, updatedAt: new Date() }).where(eq(coffees.id, id));
-  revalidatePath("/");
+  revalidatePath("/"); revalidatePath("/coffees");
   revalidatePath("/grid");
   revalidatePath(`/coffees/${id}`);
   return { ok: true, photoFile };
@@ -346,7 +346,7 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
     })
     .returning();
 
-  revalidatePath("/");
+  revalidatePath("/"); revalidatePath("/coffees");
   revalidatePath("/grid");
   redirect(`/coffees/${row.id}`);
 }
@@ -502,7 +502,7 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
     }
   }
 
-  revalidatePath("/");
+  revalidatePath("/"); revalidatePath("/coffees");
   revalidatePath("/grid");
   revalidatePath("/dashboard");
   return {

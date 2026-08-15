@@ -6,7 +6,7 @@ export const metadata = { title: "Import · Bean Vault" };
 export default function ImportPage() {
   return (
     <main className="page">
-      <Link href="/" className="back-link">← Back to all coffees</Link>
+      <Link href="/coffees" className="back-link">← Back to all coffees</Link>
       <div className="page-head">
         <h1>Import from Beanconqueror</h1>
       </div>
