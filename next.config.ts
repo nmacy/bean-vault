@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "*": ["node_modules/sharp/**", "node_modules/@img/**"],
   },
+  // Bean Vault backup imports embed photos as base64; the default 1 MB
+  // Server Action body cap rejects them.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "300mb",
+    },
+  },
 };
 
 export default nextConfig;
