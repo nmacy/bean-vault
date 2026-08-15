@@ -671,7 +671,7 @@ img {
 /* ---------- add-by-link ---------- */
 
 .link-card {
-  margin-top: 32px;
+  margin: 0 0 32px;
 }
 
 .import-columns {

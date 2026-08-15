@@ -12,8 +12,8 @@ export default function NewCoffeePage() {
       <div className="page-head">
         <h1>Add coffee</h1>
       </div>
-      <CoffeeForm action={createCoffee} submitLabel="Save coffee" />
       <LinkImportForm />
+      <CoffeeForm action={createCoffee} submitLabel="Save coffee" />
     </main>
   );
 }
