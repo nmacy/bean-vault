@@ -1,7 +1,7 @@
 import Link from "next/link";
 import ImportForm from "@/components/import-form";
 
-export const metadata = { title: "Import · Coffee Tracker" };
+export const metadata = { title: "Import · Bean Vault" };
 
 export default function ImportPage() {
   return (

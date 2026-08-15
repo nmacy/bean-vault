@@ -5,7 +5,7 @@ import { coffees } from "@/db/schema";
 import { formatCents, photoUrl } from "@/lib/format";
 import { cap } from "@/lib/cap";
 
-export const metadata = { title: "Coffees · Coffee Tracker" };
+export const metadata = { title: "Coffees · Bean Vault" };
 
 export const dynamic = "force-dynamic";
 

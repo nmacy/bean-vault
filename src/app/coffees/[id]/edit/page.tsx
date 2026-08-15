@@ -6,7 +6,7 @@ import { coffees } from "@/db/schema";
 import CoffeeForm from "@/components/coffee-form";
 import { updateCoffee } from "@/app/actions";
 
-export const metadata = { title: "Edit coffee · Coffee Tracker" };
+export const metadata = { title: "Edit coffee · Bean Vault" };
 export const dynamic = "force-dynamic";
 
 export default async function EditCoffeePage({ params }: { params: Promise<{ id: string }> }) {

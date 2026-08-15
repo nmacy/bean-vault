@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { coffees } from "@/db/schema";
 import GridEditor from "@/components/grid-editor";
 
-export const metadata = { title: "Edit grid · Coffee Tracker" };
+export const metadata = { title: "Edit grid · Bean Vault" };
 export const dynamic = "force-dynamic";
 
 export default async function GridPage() {

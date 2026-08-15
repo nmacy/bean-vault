@@ -1,4 +1,4 @@
-# Coffee Tracker
+# Bean Vault
 
 A personal web app for tracking the coffee you buy. Every bag gets its roaster,
 origin, variety, process, roast level, roast and purchase dates, price, weight,
@@ -57,6 +57,8 @@ npm start
 ## Docker (homelab)
 
 Published image: `ghcr.io/nmacy/coffee-tracker:latest` (linux/amd64, ~90 MB).
+(The GitHub repo and container image keep the original technical
+`coffee-tracker` name; the product name is Bean Vault.)
 
 Run on a Debian x64 box with Docker:
 
@@ -90,7 +92,7 @@ Notes:
 ## Importing from Beanconqueror
 
 1. In the Beanconqueror app: **Settings → Data & Storage → Export to JSON**.
-2. In Coffee Tracker: **Import** (header) → choose the file → Import beans.
+2. In Bean Vault: **Import** (header) → choose the file → Import beans.
 3. The result screen shows how many beans were imported, how many were skipped
    as already present, and whether the export contained any photos.
 

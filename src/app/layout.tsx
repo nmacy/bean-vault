@@ -3,7 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Coffee Tracker",
+  title: "Bean Vault",
   description: "Track the coffee you buy: roaster, origin, roast, price, and a snapshot.",
 };
 
@@ -14,8 +14,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="site-header">
           <div className="header-inner">
             <Link href="/" className="brand">
-              Coffee Tracker
-              <small>the beans I buy</small>
+              <img src="/bean-vault.png" alt="" className="brand-logo" width={34} height={34} />
+              <span>
+                Bean Vault
+                <small>the beans I buy</small>
+              </span>
             </Link>
             <nav style={{ display: "flex", gap: "10px", alignItems: "center" }}>
               <Link href="/grid" className="btn secondary">Grid</Link>

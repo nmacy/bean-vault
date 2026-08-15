@@ -2,7 +2,7 @@ import Link from "next/link";
 import CoffeeForm from "@/components/coffee-form";
 import { createCoffee } from "@/app/actions";
 
-export const metadata = { title: "Add coffee · Coffee Tracker" };
+export const metadata = { title: "Add coffee · Bean Vault" };
 
 export default function NewCoffeePage() {
   return (

@@ -1,10 +1,10 @@
 :root {
-  --bg: #faf6f0;
+  --bg: #fefdfb;
   --surface: #ffffff;
-  --ink: #3a2b21;
-  --muted: #8a7a6d;
-  --accent: #6f4e37;
-  --accent-dark: #583d2a;
+  --ink: #38281a;
+  --muted: #8f7d68;
+  --accent: #704830;
+  --accent-dark: #4e2f1a;
   --border: #e8ddd2;
   --danger: #b3453f;
   --danger-bg: #fdf0ef;
@@ -64,6 +64,17 @@ img {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo {
+  height: 34px;
+  width: 34px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border);
 }
 
 .brand small {
@@ -412,7 +423,7 @@ img {
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  outline: 2px solid rgb(111 78 55 / 35%);
+  outline: 2px solid rgb(112 72 48 / 35%);
   border-color: var(--accent);
 }
 
@@ -529,7 +540,7 @@ img {
 }
 
 .filter-search:focus {
-  outline: 2px solid rgb(111 78 55 / 35%);
+  outline: 2px solid rgb(112 72 48 / 35%);
   border-color: var(--accent);
 }
 
@@ -708,7 +719,7 @@ img {
 
 .grid-table input:focus,
 .grid-table select:focus {
-  outline: 2px solid rgb(111 78 55 / 40%);
+  outline: 2px solid rgb(112 72 48 / 40%);
   border-color: var(--accent);
   background: #fff;
 }

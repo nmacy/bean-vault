@@ -8,7 +8,7 @@ import { cap } from "@/lib/cap";
 import DeleteButton from "@/components/delete-button";
 import FindPhotoButton from "@/components/find-photo-button";
 
-export const metadata = { title: "Coffee · Coffee Tracker" };
+export const metadata = { title: "Coffee · Bean Vault" };
 export const dynamic = "force-dynamic";
 
 export default async function CoffeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
