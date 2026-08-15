@@ -42,3 +42,4 @@ next-env.d.ts
 
 # local data (sqlite db + uploaded photos)
 /data
+/Beanconqueror.json
