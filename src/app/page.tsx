@@ -1,69 +1,66 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from "next/link";
+import { desc } from "drizzle-orm";
+import { db } from "@/db";
+import { coffees } from "@/db/schema";
+import { formatCents, photoUrl } from "@/lib/format";
+import { cap } from "@/lib/cap";
 
-export default function Home() {
+export const metadata = { title: "Coffees · Coffee Tracker" };
+
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const all = await db.select().from(coffees).orderBy(desc(coffees.createdAt));
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="page">
+      <div className="page-head">
+        <h1>My coffees</h1>
+        <Link href="/new" className="btn">Add coffee</Link>
+      </div>
+
+      {all.length === 0 ? (
+        <div className="empty">
+          <h2>No coffee yet</h2>
+          <p>Add the first bag you have bought.</p>
+          <Link href="/new" className="btn">Add coffee</Link>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      ) : (
+        <div className="grid">
+          {all.map((c) => {
+            const src = photoUrl(c.photoFile);
+            return (
+              <Link key={c.id} href={`/coffees/${c.id}`} className="card">
+                <div className="card-photo">
+                  {src ? (
+                    <img src={src} alt={`${c.roaster} ${c.name}`} loading="lazy" />
+                  ) : (
+                    <div className="placeholder">coffee</div>
+                  )}
+                </div>
+                <div className="card-body">
+                  <h3>{c.name}</h3>
+                  <div className="roaster">{c.roaster}</div>
+                  <div className="tags">
+                    {c.origin ? <span className="tag">{c.origin}</span> : null}
+                    {c.roastLevel ? <span className="tag">{cap(c.roastLevel)}</span> : null}
+                    {c.process ? <span className="tag">{c.process}</span> : null}
+                  </div>
+                  <div className="meta">
+                    <span>
+                      {c.priceCents != null ? formatCents(c.priceCents) : ""}
+                      {c.weightGrams != null ? ` · ${c.weightGrams} g` : ""}
+                    </span>
+                    {c.rating != null ? (
+                      <span className="stars">{"★".repeat(c.rating)}</span>
+                    ) : null}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
-      </main>
-    </div>
+      )}
+    </main>
   );
 }
