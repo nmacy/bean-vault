@@ -14,11 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="site-header">
           <div className="header-inner">
             <Link href="/" className="brand">
-              <img src="/bean-vault.png" alt="" className="brand-logo" width={34} height={34} />
-              <span>
-                Bean Vault
-                <small>the beans I buy</small>
-              </span>
+              <img src="/bean-vault-header.png" alt="Bean Vault" className="brand-mark" />
             </Link>
             <nav style={{ display: "flex", gap: "10px", alignItems: "center" }}>
               <Link href="/grid" className="btn secondary">Grid</Link>
