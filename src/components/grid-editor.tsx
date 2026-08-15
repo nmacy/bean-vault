@@ -193,8 +193,9 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
   }
 
   useEffect(() => {
+    const timers = savedTimers.current;
     return () => {
-      for (const t of savedTimers.current.values()) clearTimeout(t);
+      for (const t of timers.values()) clearTimeout(t);
     };
   }, []);
 
@@ -442,7 +443,6 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
   /* ---------- cell rendering ---------- */
 
   function renderCell(row: BaseRow, key: string) {
-    const status = statuses[row.id];
     switch (key) {
       case "roaster":
         return (

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { createCoffeeFromLink, lookupProductLink, type FormState, type LinkLookupResult } from "@/app/actions";
+import { createCoffeeFromLink, lookupProductLink, type LinkLookupResult } from "@/app/actions";
 import { useActionState } from "react";
 
 export default function LinkImportForm() {
