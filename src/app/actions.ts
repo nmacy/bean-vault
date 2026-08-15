@@ -554,7 +554,8 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
         try {
           const raw = Buffer.from(c.photo.data, "base64");
           if (raw.length > 0 && raw.length <= 12 * 1024 * 1024) {
-            await savePhotoBytes(raw, ext === "jpeg" ? "jpg" : ext);
+            // The DB must reference the actual filename: keep the generated name.
+            photoFile = await savePhotoBytes(raw, ext === "jpeg" ? "jpg" : ext);
             photos += 1;
           } else {
             photoFile = null;

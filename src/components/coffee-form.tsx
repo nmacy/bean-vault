@@ -45,6 +45,7 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
   const [state, formAction, isPending] = useActionState(action, {});
   const [preview, setPreview] = useState<string | null>(null);
   const [currentPhoto, setCurrentPhoto] = useState(coffee?.photoFile ?? null);
+  const [removePhoto, setRemovePhoto] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const priceValue = coffee?.priceCents != null ? (coffee.priceCents / 100).toFixed(2) : "";
@@ -152,6 +153,7 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
                 if (file) {
                   setPreview(URL.createObjectURL(file));
                   setCurrentPhoto(null);
+                  setRemovePhoto(false);
                 } else {
                   setPreview(null);
                 }
@@ -169,9 +171,15 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
               <div className="current-photo">
                 <img src={photoHref} alt="Current photo" />
                 <label className="check-line">
-                  <input type="checkbox" name="removePhoto" value="on" checked={false}
+                  <input
+                    type="checkbox"
+                    name="removePhoto"
+                    value="on"
+                    checked={removePhoto}
                     onChange={(e) => {
-                      if (e.target.checked) {
+                      const checked = e.target.checked;
+                      setRemovePhoto(checked);
+                      if (checked) {
                         setCurrentPhoto(null);
                         setPreview(null);
                         if (fileRef.current) fileRef.current.value = "";
