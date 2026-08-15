@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/import", label: "Import" },
   { href: "/new", label: "Add coffee" },
   { href: "/api/export", label: "Export CSV" },
+  { href: "/api/export/json", label: "Backup (with photos)" },
 ];
 
 export default function NavMenu() {

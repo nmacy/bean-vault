@@ -673,6 +673,17 @@ img {
   margin-top: 32px;
 }
 
+.import-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.import-columns .form-card {
+  margin-top: 0;
+}
+
 .link-heading {
   margin: 0 0 4px;
   font-size: 17px;

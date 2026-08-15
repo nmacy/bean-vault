@@ -17,6 +17,7 @@ export type ImportState = {
   imported?: number;
   total?: number;
   photosSkipped?: number;
+  skipped?: number;
 };
 
 export type GridRow = {
@@ -348,4 +349,167 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
   revalidatePath("/");
   revalidatePath("/grid");
   redirect(`/coffees/${row.id}`);
+}
+
+/* ---------- Bean Vault backup restore ---------- */
+
+const MAX_BACKUP_BYTES = 300 * 1024 * 1024;
+const ALLOWED_PHOTO_EXTS = new Set(["jpg", "jpeg", "png", "webp", "gif", "avif"]);
+
+type BackupCoffee = {
+  id?: unknown;
+  roaster?: unknown;
+  name?: unknown;
+  origin?: unknown;
+  variety?: unknown;
+  process?: unknown;
+  roastLevel?: unknown;
+  roastDate?: unknown;
+  purchaseDate?: unknown;
+  priceCents?: unknown;
+  weightGrams?: unknown;
+  rating?: unknown;
+  notes?: unknown;
+  tastingNotes?: unknown;
+  decaffeinated?: unknown;
+  photoFile?: unknown;
+  photo?: { data?: unknown } | null;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
+function backupStr(v: unknown): string | null {
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+function backupNum(v: unknown, min: number, max: number): number | null {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  return v >= min && v <= max ? Math.round(v) : null;
+}
+
+function backupDate(v: unknown): Date | null {
+  if (typeof v !== "string") return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Restore a Bean Vault JSON backup. Rows are upserted by id, so re-importing
+ * the same backup is idempotent; rows not in the backup are left untouched.
+ * Photos embedded in the backup are written back alongside their records.
+ */
+export async function importBackup(_prev: ImportState, formData: FormData): Promise<ImportState> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { message: "Choose a Bean Vault backup JSON file." };
+  }
+  if (file.size > MAX_BACKUP_BYTES) {
+    return { message: "Backup file is larger than 300 MB." };
+  }
+
+  let root: unknown;
+  try {
+    root = JSON.parse(await file.text());
+  } catch {
+    return { message: "Not valid JSON." };
+  }
+  if (typeof root !== "object" || root === null) return { message: "Not a Bean Vault backup." };
+  const rec = root as Record<string, unknown>;
+  if (rec.beanVault !== 1 || !Array.isArray(rec.coffees)) {
+    return { message: "Not a Bean Vault backup (missing beanVault/coffees)." };
+  }
+
+  let created = 0;
+  let updated = 0;
+  let photos = 0;
+  let skipped = 0;
+
+  for (const entry of rec.coffees) {
+    if (typeof entry !== "object" || entry === null) {
+      skipped += 1;
+      continue;
+    }
+    const c = entry as BackupCoffee;
+    const id = backupNum(c.id, 1, 1_000_000_000);
+    const roaster = backupStr(c.roaster);
+    const name = backupStr(c.name);
+    if (id === null || !roaster || !name) {
+      skipped += 1;
+      continue;
+    }
+
+    // Write the embedded photo first (idempotent: same bytes, same name).
+    let photoFile = backupStr(c.photoFile);
+    if (c.photo && typeof c.photo.data === "string" && photoFile) {
+      const ext = photoFile.split(".").pop()?.toLowerCase() ?? "";
+      if (ALLOWED_PHOTO_EXTS.has(ext) && c.photo.data.length > 0) {
+        try {
+          const raw = Buffer.from(c.photo.data, "base64");
+          if (raw.length > 0 && raw.length <= 12 * 1024 * 1024) {
+            await savePhotoBytes(raw, ext === "jpeg" ? "jpg" : ext);
+            photos += 1;
+          } else {
+            photoFile = null;
+          }
+        } catch {
+          photoFile = null;
+        }
+      } else {
+        photoFile = null;
+      }
+    }
+
+    const createdAt = backupDate(c.createdAt) ?? new Date();
+    const updatedAt = backupDate(c.updatedAt) ?? new Date();
+    const existing = await db.select().from(coffees).where(eq(coffees.id, id));
+
+    const values = {
+      roaster,
+      name,
+      origin: backupStr(c.origin),
+      variety: backupStr(c.variety),
+      process: backupStr(c.process),
+      roastLevel: backupStr(c.roastLevel),
+      roastDate: backupStr(c.roastDate),
+      purchaseDate: backupStr(c.purchaseDate),
+      priceCents: backupNum(c.priceCents, 0, 100_000_000),
+      weightGrams: backupNum(c.weightGrams, 1, 1_000_000),
+      rating: backupNum(c.rating, 1, 5),
+      notes: backupStr(c.notes),
+      tastingNotes: backupStr(c.tastingNotes),
+    };
+
+    if (existing.length > 0) {
+      await db
+        .update(coffees)
+        .set({
+          ...values,
+          // Only replace the photo when the backup embeds one.
+          photoFile: photoFile ?? existing[0].photoFile,
+          updatedAt,
+        })
+        .where(eq(coffees.id, id));
+      updated += 1;
+    } else {
+      await db.insert(coffees).values({
+        id,
+        ...values,
+        photoFile,
+        createdAt,
+        updatedAt,
+      });
+      created += 1;
+    }
+  }
+
+  revalidatePath("/");
+  revalidatePath("/grid");
+  revalidatePath("/dashboard");
+  return {
+    message: "Backup restored.",
+    imported: created,
+    total: created + updated,
+    photosSkipped: photos,
+    skipped,
+  };
 }
