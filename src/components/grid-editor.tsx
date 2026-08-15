@@ -12,6 +12,8 @@ type Cell = {
   region: string;
   mix: string;
   variety: string;
+  producer: string;
+  elevation: string;
   process: string;
   roastLevel: string;
   roastDate: string;
@@ -28,7 +30,7 @@ type Status = { kind: "saving" | "saved" | "finding" | "error"; msg?: string };
 const ROAST_LEVELS = ["light", "medium-light", "medium", "medium-dark", "dark"];
 const ROAST_ORDER = new Map(ROAST_LEVELS.map((l, i) => [l, i]));
 
-const TEXT_FIELDS: (keyof Cell)[] = ["roaster", "name", "country", "region", "variety", "process"];
+const TEXT_FIELDS: (keyof Cell)[] = ["roaster", "name", "country", "region", "variety", "producer", "elevation", "process"];
 
 const COLUMNS: { key: string; label: string }[] = [
   { key: "roaster", label: "Roaster" },
@@ -36,6 +38,8 @@ const COLUMNS: { key: string; label: string }[] = [
   { key: "country", label: "Country" },
   { key: "region", label: "Region" },
   { key: "variety", label: "Variety" },
+  { key: "producer", label: "Producer" },
+  { key: "elevation", label: "Elevation" },
   { key: "process", label: "Process" },
   { key: "mix", label: "Type" },
   { key: "roastLevel", label: "Roast" },
@@ -74,6 +78,8 @@ function toCell(row: GridRow): Cell {
     region: row.region ?? "",
     mix: row.mix ?? "",
     variety: row.variety ?? "",
+    producer: row.producer ?? "",
+    elevation: row.elevation ?? "",
     process: row.process ?? "",
     roastLevel: row.roastLevel ?? "",
     roastDate: row.roastDate ?? "",
@@ -95,6 +101,8 @@ function toPayload(row: BaseRow, cell: Cell): GridRow {
     region: cell.region.trim() || null,
     mix: cell.mix || null,
     variety: cell.variety.trim() || null,
+    producer: cell.producer.trim() || null,
+    elevation: cell.elevation.trim() || null,
     process: cell.process.trim() || null,
     roastLevel: cell.roastLevel || null,
     roastDate: cell.roastDate || null,
@@ -378,7 +386,7 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
   const visible = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
     let list = rows.filter(({ row, cell }) => {
-      if (q && ![cell.roaster, cell.name, cell.country, cell.region, cell.variety, cell.process].some((f) => f.toLowerCase().includes(q))) {
+      if (q && ![cell.roaster, cell.name, cell.country, cell.region, cell.variety, cell.producer, cell.process].some((f) => f.toLowerCase().includes(q))) {
         return false;
       }
       if (filters.roaster && row.roaster !== filters.roaster) return false;
@@ -498,6 +506,10 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
         );
       case "variety":
         return <td><input value={cellValue(row.id, "variety")} onChange={(e) => setCell(row.id, "variety", e.target.value)} onBlur={() => handleBlur(row.id, "variety")} /></td>;
+      case "producer":
+        return <td><input value={cellValue(row.id, "producer")} onChange={(e) => setCell(row.id, "producer", e.target.value)} onBlur={() => handleBlur(row.id, "producer")} /></td>;
+      case "elevation":
+        return <td><input value={cellValue(row.id, "elevation")} onChange={(e) => setCell(row.id, "elevation", e.target.value)} onBlur={() => handleBlur(row.id, "elevation")} /></td>;
       case "process":
         return <td><input value={cellValue(row.id, "process")} onChange={(e) => setCell(row.id, "process", e.target.value)} onBlur={() => handleBlur(row.id, "process")} /></td>;
       case "roastLevel":
@@ -561,6 +573,8 @@ function renderReadCell(row: BaseRow, key: string) {
       case "region": return text(row.region ?? "");
       case "mix": return text(row.mix ?? "");
       case "variety": return text(row.variety ?? "");
+      case "producer": return text(row.producer ?? "");
+      case "elevation": return text(row.elevation ?? "");
       case "process": return text(row.process ?? "");
       case "roastLevel": return text(row.roastLevel ?? "");
       case "roastDate": return text(row.roastDate ?? "");

@@ -32,6 +32,8 @@ export async function GET() {
       region: r.region,
       mix: r.mix,
       variety: r.variety,
+      producer: r.producer,
+      elevation: r.elevation,
       process: r.process,
       roastLevel: r.roastLevel,
       roastDate: r.roastDate,

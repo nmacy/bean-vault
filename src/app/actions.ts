@@ -33,6 +33,8 @@ export type GridRow = {
   region: string | null;
   mix: string | null;
   variety: string | null;
+  producer: string | null;
+  elevation: string | null;
   process: string | null;
   roastLevel: string | null;
   roastDate: string | null;
@@ -80,6 +82,8 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
           mix: row.mix,
           origin: joinOrigin(row.country, row.region),
           variety: row.variety,
+          producer: row.producer,
+          elevation: row.elevation,
           process: row.process,
           roastLevel: row.roastLevel,
           roastDate: row.roastDate,
@@ -156,6 +160,8 @@ function collect(form: FormData) {
     region: text(form, "region"),
     mix: text(form, "mix"),
     variety: text(form, "variety"),
+    producer: text(form, "producer"),
+    elevation: text(form, "elevation"),
     process: text(form, "process"),
     roastLevel: text(form, "roastLevel"),
     roastDate: dateField(form, "roastDate"),
@@ -191,6 +197,8 @@ export async function createCoffee(_prev: FormState, formData: FormData): Promis
       mix: input.mix,
       origin: joinOrigin(input.country, input.region),
       variety: input.variety,
+      producer: input.producer,
+      elevation: input.elevation,
       process: input.process,
       roastLevel: input.roastLevel,
       roastDate: input.roastDate,
@@ -217,6 +225,8 @@ function fields(input: Collected) {
     region: input.region,
     mix: input.mix,
     variety: input.variety,
+    producer: input.producer,
+    elevation: input.elevation,
     process: input.process,
     roastLevel: input.roastLevel,
     roastDate: input.roastDate,
@@ -347,6 +357,9 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
   const weightOverride = intField(formData, "weight", 1, 1_000_000);
   const country = text(formData, "country");
   const region = text(formData, "region");
+  const variety = text(formData, "variety");
+  const producer = text(formData, "producer");
+  const elevation = text(formData, "elevation");
   const process = text(formData, "process");
   const roastLevel = text(formData, "roastLevel");
   const tastingNotes = text(formData, "tastingNotes");
@@ -379,6 +392,9 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
       region,
       mix: text(formData, "mix"),
       origin: joinOrigin(country, region),
+      variety,
+      producer,
+      elevation,
       process,
       roastLevel,
       tastingNotes,
@@ -412,6 +428,8 @@ type BackupCoffee = {
   region?: unknown;
   mix?: unknown;
   variety?: unknown;
+  producer?: unknown;
+  elevation?: unknown;
   process?: unknown;
   roastLevel?: unknown;
   roastDate?: unknown;
@@ -523,6 +541,8 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
       mix: backupStr(c.mix),
       origin: joinOrigin(backupCountry, backupRegion),
       variety: backupStr(c.variety),
+      producer: backupStr(c.producer),
+      elevation: backupStr(c.elevation),
       process: backupStr(c.process),
       roastLevel: backupStr(c.roastLevel),
       roastDate: backupStr(c.roastDate),
@@ -611,6 +631,8 @@ export async function importBeanVaultCsv(_prev: ImportState, formData: FormData)
     mix: idx("mix"),
     origin: idx("origin"),
     variety: idx("variety"),
+    producer: idx("producer"),
+    elevation: idx("elevation"),
     process: idx("process"),
     roastLevel: idx("roast_level"),
     roastDate: idx("roast_date"),
@@ -677,6 +699,8 @@ export async function importBeanVaultCsv(_prev: ImportState, formData: FormData)
       mix: csvCell(row, col.mix) || null,
       origin: joinOrigin(country, region),
       variety: csvCell(row, col.variety) || null,
+      producer: csvCell(row, col.producer) || null,
+      elevation: csvCell(row, col.elevation) || null,
       process: csvCell(row, col.process) || null,
       roastLevel: csvCell(row, col.roastLevel) || null,
       roastDate: csvCell(row, col.roastDate) || null,

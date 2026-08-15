@@ -45,6 +45,8 @@ export default async function CoffeeDetailPage({ params }: { params: Promise<{ i
           <dl className="fields">
             {coffee.country ? <><dt>Country</dt><dd>{coffee.country}</dd></> : null}
             {coffee.region ? <><dt>Region</dt><dd>{coffee.region}</dd></> : null}
+            {coffee.producer ? <><dt>Producer</dt><dd>{coffee.producer}</dd></> : null}
+            {coffee.elevation ? <><dt>Elevation</dt><dd>{coffee.elevation}</dd></> : null}
             {coffee.variety ? <><dt>Variety</dt><dd>{coffee.variety}</dd></> : null}
             {coffee.process ? <><dt>Process</dt><dd>{coffee.process}</dd></> : null}
             {coffee.roastLevel ? <><dt>Roast</dt><dd>{cap(coffee.roastLevel)}</dd></> : null}

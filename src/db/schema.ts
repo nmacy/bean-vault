@@ -9,6 +9,8 @@ export const coffees = sqliteTable("coffees", {
   region: text("region"),
   mix: text("mix"), // "single-origin" | "blend"
   variety: text("variety"),
+  producer: text("producer"),
+  elevation: text("elevation"),
   process: text("process"),
   roastLevel: text("roast_level"),
   roastDate: text("roast_date"), // ISO YYYY-MM-DD

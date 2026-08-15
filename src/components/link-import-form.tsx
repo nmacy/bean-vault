@@ -28,6 +28,9 @@ export default function LinkImportForm() {
   // AI-filled, editable fields
   const [country, setCountry] = useState("");
   const [region, setRegion] = useState("");
+  const [variety, setVariety] = useState("");
+  const [producer, setProducer] = useState("");
+  const [elevation, setElevation] = useState("");
   const [process, setProcess] = useState("");
   const [roastLevel, setRoastLevel] = useState("");
   const [mix, setMix] = useState("");
@@ -81,6 +84,9 @@ export default function LinkImportForm() {
     const f = res.fields;
     setCountry(f.country ?? "");
     setRegion(f.region ?? "");
+    setVariety(f.variety ?? "");
+    setProducer(f.producer ?? "");
+    setElevation(f.elevation ?? "");
     setProcess(f.process ?? "");
     setRoastLevel(f.roastLevel ?? "");
     setMix(f.mix ?? "");
@@ -90,6 +96,9 @@ export default function LinkImportForm() {
     const filled: { label: string }[] = [];
     if (f.country) filled.push({ label: "Country" });
     if (f.region) filled.push({ label: "Region" });
+    if (f.variety) filled.push({ label: "Variety" });
+    if (f.producer) filled.push({ label: "Producer" });
+    if (f.elevation) filled.push({ label: "Elevation" });
     if (f.process) filled.push({ label: "Process" });
     if (f.roastLevel) filled.push({ label: "Roast" });
     if (f.mix) filled.push({ label: "Type" });
@@ -109,6 +118,9 @@ export default function LinkImportForm() {
   function clearAi() {
     setCountry("");
     setRegion("");
+    setVariety("");
+    setProducer("");
+    setElevation("");
     setProcess("");
     setRoastLevel("");
     setMix("");
@@ -236,6 +248,18 @@ export default function LinkImportForm() {
             <div className="field">
               <label htmlFor="link-region">Region</label>
               <input id="link-region" name="region" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="e.g. Santa Monica" />
+            </div>
+            <div className="field">
+              <label htmlFor="link-variety">Variety</label>
+              <input id="link-variety" name="variety" value={variety} onChange={(e) => setVariety(e.target.value)} placeholder="e.g. Gesha" />
+            </div>
+            <div className="field">
+              <label htmlFor="link-producer">Producer</label>
+              <input id="link-producer" name="producer" value={producer} onChange={(e) => setProducer(e.target.value)} placeholder="Farm or grower" />
+            </div>
+            <div className="field">
+              <label htmlFor="link-elevation">Elevation</label>
+              <input id="link-elevation" name="elevation" value={elevation} onChange={(e) => setElevation(e.target.value)} placeholder="e.g. 1,900 m" />
             </div>
             <div className="field">
               <label htmlFor="link-process">Process</label>

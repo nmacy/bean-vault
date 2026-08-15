@@ -16,6 +16,8 @@ export default async function CoffeesPage() {
       region: coffees.region,
       mix: coffees.mix,
       variety: coffees.variety,
+      producer: coffees.producer,
+      elevation: coffees.elevation,
       process: coffees.process,
       roastLevel: coffees.roastLevel,
       roastDate: coffees.roastDate,

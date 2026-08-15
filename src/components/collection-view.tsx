@@ -16,6 +16,8 @@ export type BeanItem = {
   region: string | null;
   mix: string | null;
   variety: string | null;
+  producer: string | null;
+  elevation: string | null;
   process: string | null;
   roastLevel: string | null;
   roastDate: string | null;

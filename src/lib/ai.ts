@@ -16,12 +16,14 @@ export const ROAST_LEVELS = ["light", "medium-light", "medium", "medium-dark", "
 export type AiCoffeeFields = {
   country: string | null;
   region: string | null;
+  variety: string | null;
+  producer: string | null;
+  elevation: string | null;
   process: string | null;
   roastLevel: string | null;
   mix: string | null; // "blend" | "single-origin"
   decaffeinated: boolean;
   tastingNotes: string | null;
-  variety: string | null;
   description: string | null;
 };
 
@@ -116,12 +118,14 @@ function parseFields(data: unknown): AiCoffeeFields {
   return {
     country: cleanString(rec.country),
     region: cleanString(rec.region),
+    variety: cleanString(rec.variety),
+    producer: cleanString(rec.producer),
+    elevation: cleanString(rec.elevation),
     process: cleanString(rec.process),
     roastLevel,
     mix,
     decaffeinated: decaf,
     tastingNotes: cleanString(rec.tastingNotes ?? rec.tasting_notes),
-    variety: cleanString(rec.variety),
     description: cleanString(rec.description),
   };
 }
@@ -159,10 +163,11 @@ export async function enrichCoffeePage(url: string, apiKey: string): Promise<Enr
             role: "system",
             content:
               "You extract facts about a bag of coffee from a store product page. " +
-              "Return ONLY a JSON object with these keys: country, region, process, " +
+              "Return ONLY a JSON object with these keys: country, region, variety, " +
+              "producer (grower or farm), elevation (in meters/masl), process, " +
               "roastLevel (one of: light, medium-light, medium, medium-dark, dark), " +
               "mix (blend or single-origin), decaffeinated (boolean), tastingNotes, " +
-              "variety, description. Use null when the page does not say. If the page " +
+              "description. Use null when the page does not say. If the page " +
               "mentions bag size options, ignore them.",
           },
           { role: "user", content: `Store page URL: ${url}\n\nPage text:\n${text}` },
