@@ -185,3 +185,20 @@ Dockerfile                   # multi-stage, standalone output (~90 MB)
   add moving parts for zero real gain here. List thumbnails lazy-load.
 - Prices are stored as cents and displayed in USD (matching the Beanconqueror
   export currency).
+## AI enrichment (optional)
+
+When adding a coffee **from a store link**, an "Ask AI to fill details"
+button sends the product page to [OpenRouter](https://openrouter.ai) and
+prefills editable fields — country, region, process, roast level,
+blend/single-origin, decaf, tasting notes, and the product description as
+notes. This is an assisted draft; nothing is saved until you review.
+
+Setup: copy `.env.example` to `.env.local` and set your OpenRouter key:
+
+```bash
+cp .env.example .env.local   # then edit: OPENROUTER_API_KEY=sk-or-…
+```
+
+Optional `OPENROUTER_MODEL` overrides the default `openai/gpt-4o-mini`.
+The key is read server-side only and never sent to the browser. Without a
+key the button explains that the app is not configured.

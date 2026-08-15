@@ -1,9 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
-import { createCoffeeFromLink, lookupProductLink, type LinkLookupResult } from "@/app/actions";
-import { useActionState } from "react";
+import {
+  aiEnrichProduct,
+  createCoffeeFromLink,
+  lookupProductLink,
+  type LinkLookupResult,
+} from "@/app/actions";
+
+const ROAST_LEVELS = ["light", "medium-light", "medium", "medium-dark", "dark"];
 
 export default function LinkImportForm() {
   const [url, setUrl] = useState("");
@@ -13,7 +19,19 @@ export default function LinkImportForm() {
   const [variantIndex, setVariantIndex] = useState(0);
   const [price, setPrice] = useState("");
   const [weight, setWeight] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiNote, setAiNote] = useState<string | null>(null);
   const [state, formAction, isPending] = useActionState(createCoffeeFromLink, {});
+
+  // AI-filled, editable fields
+  const [country, setCountry] = useState("");
+  const [region, setRegion] = useState("");
+  const [process, setProcess] = useState("");
+  const [roastLevel, setRoastLevel] = useState("");
+  const [mix, setMix] = useState("");
+  const [decaf, setDecaf] = useState(false);
+  const [tastingNotes, setTastingNotes] = useState("");
+  const [notes, setNotes] = useState("");
 
   async function lookUp() {
     const trimmed = url.trim();
@@ -24,6 +42,7 @@ export default function LinkImportForm() {
     setBusy(true);
     setError(null);
     setProduct(null);
+    setAiNote(null);
     const res = await lookupProductLink(trimmed);
     setBusy(false);
     if (!res.ok) {
@@ -44,6 +63,28 @@ export default function LinkImportForm() {
       setPrice(v.priceCents != null ? (v.priceCents / 100).toFixed(2) : "");
       setWeight(v.weightGrams != null ? String(v.weightGrams) : "");
     }
+  }
+
+  async function askAi() {
+    if (!url.trim()) return;
+    setAiBusy(true);
+    setAiNote(null);
+    const res = await aiEnrichProduct(url.trim());
+    setAiBusy(false);
+    if (!res.ok) {
+      setAiNote(res.message);
+      return;
+    }
+    const f = res.fields;
+    setCountry(f.country ?? "");
+    setRegion(f.region ?? "");
+    setProcess(f.process ?? "");
+    setRoastLevel(f.roastLevel ?? "");
+    setMix(f.mix ?? "");
+    setDecaf(f.decaffeinated);
+    setTastingNotes(f.tastingNotes ?? "");
+    if (!notes) setNotes(f.description ?? "");
+    setAiNote("AI filled the fields below — adjust anything before saving.");
   }
 
   return (
@@ -111,6 +152,13 @@ export default function LinkImportForm() {
             </div>
           ) : null}
 
+          <div className="form-actions">
+            <button type="button" className="btn secondary" onClick={() => void askAi()} disabled={aiBusy}>
+              {aiBusy ? "Asking AI…" : "Ask AI to fill details"}
+            </button>
+          </div>
+          {aiNote ? <p className="link-hint ai-note">{aiNote}</p> : null}
+
           <div className="form-grid">
             <div className="field">
               <label htmlFor="link-name">Name</label>
@@ -124,9 +172,47 @@ export default function LinkImportForm() {
               <label htmlFor="link-weight">Weight <span className="hint">(g)</span></label>
               <input id="link-weight" name="weight" type="number" inputMode="numeric" step="1" min="1" value={weight} onChange={(e) => setWeight(e.target.value)} />
             </div>
+            <div className="field">
+              <label htmlFor="link-country">Country</label>
+              <input id="link-country" name="country" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. Colombia" />
+            </div>
+            <div className="field">
+              <label htmlFor="link-region">Region</label>
+              <input id="link-region" name="region" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="e.g. Santa Monica" />
+            </div>
+            <div className="field">
+              <label htmlFor="link-process">Process</label>
+              <input id="link-process" name="process" value={process} onChange={(e) => setProcess(e.target.value)} placeholder="e.g. washed" />
+            </div>
+            <div className="field">
+              <label htmlFor="link-roast">Roast level</label>
+              <select id="link-roast" name="roastLevel" value={roastLevel} onChange={(e) => setRoastLevel(e.target.value)}>
+                <option value="">—</option>
+                {ROAST_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="link-mix">Type</label>
+              <select id="link-mix" name="mix" value={mix} onChange={(e) => setMix(e.target.value)}>
+                <option value="">—</option>
+                <option value="single-origin">Single origin</option>
+                <option value="blend">Blend</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="link-decaf">Decaffeinated</label>
+              <label className="check-line">
+                <input id="link-decaf" name="decaffeinated" type="checkbox" value="on" checked={decaf} onChange={(e) => setDecaf(e.target.checked)} />
+                This is a decaf roast
+              </label>
+            </div>
             <div className="field wide">
-              <label htmlFor="link-notes">Notes</label>
-              <textarea id="link-notes" name="notes" placeholder="Anything worth remembering about this bag…" />
+              <label htmlFor="link-tasting">Tasting notes</label>
+              <textarea id="link-tasting" name="tastingNotes" value={tastingNotes} onChange={(e) => setTastingNotes(e.target.value)} placeholder="Sweet citrus, chocolate, syrupy body…" />
+            </div>
+            <div className="field wide">
+              <label htmlFor="link-notes">Notes / description</label>
+              <textarea id="link-notes" name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything worth remembering about this bag…" />
             </div>
           </div>
 

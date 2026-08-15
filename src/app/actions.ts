@@ -10,6 +10,7 @@ import { dateField, dollarsToCents, intField, photoFile as readPhoto, requiredTe
 import { parseBeanconqueror } from "@/lib/beanconqueror";
 import { bestMatch, lookupProductPage, storeFor, storeProducts, type StoreProductDetail } from "@/lib/storefinder";
 import { parseCsv } from "@/lib/csv";
+import { enrichCoffeePage, type AiCoffeeFields } from "@/lib/ai";
 import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -344,6 +345,12 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
   const nameOverride = text(formData, "name");
   const priceOverride = dollarsToCents(formData, "price");
   const weightOverride = intField(formData, "weight", 1, 1_000_000);
+  const country = text(formData, "country");
+  const region = text(formData, "region");
+  const process = text(formData, "process");
+  const roastLevel = text(formData, "roastLevel");
+  const tastingNotes = text(formData, "tastingNotes");
+  const decaf = formData.get("decaffeinated") === "on";
   const roaster = requiredText(formData, "roaster") ?? page.roaster;
   const name = nameOverride ?? page.name;
   if (!name) return { message: "Coffee name is required." };
@@ -367,6 +374,14 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
     .values({
       roaster,
       name,
+      country,
+      region,
+      mix: text(formData, "mix"),
+      origin: joinOrigin(country, region),
+      process,
+      roastLevel,
+      tastingNotes,
+      decaffeinated: decaf,
       priceCents: priceOverride ?? variant.priceCents ?? null,
       weightGrams: weightOverride ?? variant.weightGrams ?? null,
       notes: text(formData, "notes"),
@@ -705,4 +720,16 @@ export async function importBeanVaultCsv(_prev: ImportState, formData: FormData)
     photosSkipped: photosMissing,
     skipped,
   };
+}
+
+/* ---------- AI enrichment (OpenRouter) ---------- */
+
+
+export type AiEnrichResult =
+  | { ok: true; fields: AiCoffeeFields }
+  | { ok: false; message: string };
+
+/** Fetch the product page server-side and ask the AI to fill coffee facts. */
+export async function aiEnrichProduct(url: string): Promise<AiEnrichResult> {
+  return enrichCoffeePage(url);
 }
