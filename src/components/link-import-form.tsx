@@ -21,6 +21,8 @@ export default function LinkImportForm() {
   const [weight, setWeight] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiNote, setAiNote] = useState<string | null>(null);
+  const [aiFilled, setAiFilled] = useState<{ label: string }[] | null>(null);
+  const [aiUsed, setAiUsed] = useState(false);
   const [state, formAction, isPending] = useActionState(createCoffeeFromLink, {});
 
   // AI-filled, editable fields
@@ -69,6 +71,7 @@ export default function LinkImportForm() {
     if (!url.trim()) return;
     setAiBusy(true);
     setAiNote(null);
+    setAiFilled(null);
     const res = await aiEnrichProduct(url.trim());
     setAiBusy(false);
     if (!res.ok) {
@@ -84,7 +87,36 @@ export default function LinkImportForm() {
     setDecaf(f.decaffeinated);
     setTastingNotes(f.tastingNotes ?? "");
     if (!notes) setNotes(f.description ?? "");
-    setAiNote("AI filled the fields below — adjust anything before saving.");
+    const filled: { label: string }[] = [];
+    if (f.country) filled.push({ label: "Country" });
+    if (f.region) filled.push({ label: "Region" });
+    if (f.process) filled.push({ label: "Process" });
+    if (f.roastLevel) filled.push({ label: "Roast" });
+    if (f.mix) filled.push({ label: "Type" });
+    if (f.decaffeinated) filled.push({ label: "Decaf" });
+    if (f.tastingNotes) filled.push({ label: "Tasting notes" });
+    if (f.description) filled.push({ label: "Description" });
+    setAiFilled(filled);
+    if (filled.length > 0) {
+      setAiUsed(true);
+      setAiNote("AI read the store page and filled the fields below — adjust anything before saving.");
+    } else {
+      setAiUsed(true);
+      setAiNote("The AI read the store page but found no extra details to add. The name, price and photo are filled.");
+    }
+  }
+
+  function clearAi() {
+    setCountry("");
+    setRegion("");
+    setProcess("");
+    setRoastLevel("");
+    setMix("");
+    setDecaf(false);
+    setTastingNotes("");
+    setAiFilled(null);
+    setAiUsed(false);
+    setAiNote(null);
   }
 
   return (
@@ -157,7 +189,32 @@ export default function LinkImportForm() {
               {aiBusy ? "Asking AI…" : "Ask AI to fill details"}
             </button>
           </div>
-          {aiNote ? <p className="link-hint ai-note">{aiNote}</p> : null}
+          {aiUsed ? <input type="hidden" name="aiUsed" value="on" /> : null}
+          {aiNote ? (
+            <div className={aiFilled ? "ai-banner" : "form-error"}>
+              <span className="ai-banner-title">
+                <span className="ai-badge">AI</span>
+                {aiFilled ? "AI extracted details from the store page" : "AI note"}
+              </span>
+              {aiFilled ? (
+                <span className="ai-banner-body">
+                  {aiNote}
+                  <span className="ai-chips">
+                    {aiFilled.map((c) => (
+                      <span key={c.label} className="ai-chip">{c.label}</span>
+                    ))}
+                  </span>
+                </span>
+              ) : (
+                <span className="ai-banner-body">{aiNote}</span>
+              )}
+              {aiFilled ? (
+                <button type="button" className="btn btn-small btn-secondary" onClick={clearAi}>
+                  Undo AI fill
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="form-grid">
             <div className="field">

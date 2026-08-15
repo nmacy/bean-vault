@@ -1,0 +1,1 @@
+ALTER TABLE `coffees` ADD `ai_enriched` integer DEFAULT false NOT NULL;

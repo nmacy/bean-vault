@@ -19,6 +19,7 @@ export const coffees = sqliteTable("coffees", {
   notes: text("notes"),
   tastingNotes: text("tasting_notes"),
   decaffeinated: integer("decaffeinated", { mode: "boolean" }).notNull().default(false),
+  aiEnriched: integer("ai_enriched", { mode: "boolean" }).notNull().default(false),
   photoFile: text("photo_file"), // filename inside data/uploads
   sourceUuid: text("source_uuid").unique(), // Beanconqueror bean uuid for idempotent import
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),

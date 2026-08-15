@@ -351,6 +351,7 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
   const roastLevel = text(formData, "roastLevel");
   const tastingNotes = text(formData, "tastingNotes");
   const decaf = formData.get("decaffeinated") === "on";
+  const aiUsed = formData.get("aiUsed") === "on";
   const roaster = requiredText(formData, "roaster") ?? page.roaster;
   const name = nameOverride ?? page.name;
   if (!name) return { message: "Coffee name is required." };
@@ -382,6 +383,7 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
       roastLevel,
       tastingNotes,
       decaffeinated: decaf,
+      aiEnriched: aiUsed,
       priceCents: priceOverride ?? variant.priceCents ?? null,
       weightGrams: weightOverride ?? variant.weightGrams ?? null,
       notes: text(formData, "notes"),
@@ -619,6 +621,7 @@ export async function importBeanVaultCsv(_prev: ImportState, formData: FormData)
     weight: idx("weight_grams"),
     rating: idx("rating"),
     decaf: idx("decaffeinated"),
+    aiEnriched: idx("ai_enriched"),
     photo: idx("photo"),
   };
   if (col.roaster < 0 || col.name < 0) {
@@ -682,6 +685,7 @@ export async function importBeanVaultCsv(_prev: ImportState, formData: FormData)
       notes: csvCell(row, col.notes) || null,
       rating: csvNum(csvCell(row, col.rating)),
       decaffeinated,
+      aiEnriched: col.aiEnriched >= 0 ? ["yes", "true", "1", "x"].includes(csvCell(row, col.aiEnriched).toLowerCase()) : false,
     };
     const price = csvNum(csvCell(row, col.price));
     const weight = csvNum(csvCell(row, col.weight));
@@ -694,6 +698,7 @@ export async function importBeanVaultCsv(_prev: ImportState, formData: FormData)
           priceCents: price !== null ? Math.round(price * 100) : null,
           weightGrams: weight !== null && weight > 0 ? Math.round(weight) : null,
           photoFile: photoFile ?? existing[0].photoFile,
+          ...(col.aiEnriched >= 0 ? { aiEnriched: values.aiEnriched } : {}),
           updatedAt: new Date(),
         })
         .where(eq(coffees.id, existingId));

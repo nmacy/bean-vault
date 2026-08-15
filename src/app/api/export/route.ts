@@ -23,7 +23,7 @@ export async function GET() {
   const header = [
     "id", "roaster", "name", "country", "region", "mix", "variety", "process", "roast_level",
     "roast_date", "purchase_date", "tasting_notes", "notes", "price_usd",
-    "weight_grams", "rating", "decaffeinated", "photo", "added_at",
+    "weight_grams", "rating", "decaffeinated", "ai_enriched", "photo", "added_at",
   ];
   let csv = csvRow(header);
   for (const r of rows) {
@@ -45,6 +45,7 @@ export async function GET() {
       r.weightGrams != null ? String(r.weightGrams) : null,
       r.rating != null ? String(r.rating) : null,
       r.decaffeinated ? "yes" : "no",
+      r.aiEnriched ? "yes" : "no",
       r.photoFile,
       r.createdAt.toISOString(),
     ]);

@@ -24,6 +24,7 @@ export default async function CoffeesPage() {
       weightGrams: coffees.weightGrams,
       rating: coffees.rating,
       decaffeinated: coffees.decaffeinated,
+      aiEnriched: coffees.aiEnriched,
       photoFile: coffees.photoFile,
     })
     .from(coffees)

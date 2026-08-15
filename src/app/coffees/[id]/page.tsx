@@ -64,6 +64,7 @@ export default async function CoffeeDetailPage({ params }: { params: Promise<{ i
           {coffee.notes ? <div className="notes">{coffee.notes}</div> : null}
 
           <div className="tags">
+            {coffee.aiEnriched ? <span className="tag tag-ai" title="Details filled with AI">AI</span> : null}
             {coffee.mix === "blend" ? <span className="tag">Blend</span> : coffee.mix === "single-origin" ? <span className="tag">Single origin</span> : null}
             {coffee.decaffeinated ? <span className="tag">Decaf</span> : null}
             <span className="tag">Added {coffee.createdAt.toLocaleDateString()}</span>

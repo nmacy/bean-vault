@@ -42,6 +42,7 @@ export async function GET() {
       notes: r.notes,
       tastingNotes: r.tastingNotes,
       decaffeinated: r.decaffeinated,
+      aiEnriched: r.aiEnriched,
       photoFile: r.photoFile,
       photo,
       createdAt: r.createdAt.toISOString(),

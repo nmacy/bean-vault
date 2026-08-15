@@ -24,6 +24,7 @@ export type BeanItem = {
   weightGrams: number | null;
   rating: number | null;
   decaffeinated: boolean;
+  aiEnriched: boolean;
   photoFile: string | null;
 };
 
