@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { formatCents } from "@/lib/format";
 
 type Row = {
   id: number;
+  name: string;
   roaster: string;
   origin: string | null;
   process: string | null;
@@ -16,6 +18,7 @@ type Row = {
   weightGrams: number | null;
   rating: number | null;
   decaffeinated: boolean;
+  photoFile: string | null;
 };
 
 const PRESETS = [
@@ -28,6 +31,8 @@ const PRESETS = [
 ] as const;
 
 type PresetId = (typeof PRESETS)[number]["id"];
+
+type Segment = { label: string; value: number; rows: Row[] };
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -64,9 +69,28 @@ function median(nums: number[]): number | null {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
+/** Category counts (top N + "Other") with the underlying rows per segment. */
+function categorySegments(rows: Row[], get: (r: Row) => string | null, top: number): Segment[] {
+  const groups = new Map<string, Row[]>();
+  for (const r of rows) {
+    const k = get(r);
+    if (k === null || k === "") continue;
+    const g = groups.get(k) ?? [];
+    g.push(r);
+    groups.set(k, g);
+  }
+  const sorted = [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+  const head = sorted.slice(0, top);
+  const rest = sorted.slice(top).flatMap(([, g]) => g);
+  const out: Segment[] = head.map(([label, g]) => ({ label, value: g.length, rows: g }));
+  if (rest.length > 0) out.push({ label: "Other", value: rest.length, rows: rest });
+  return out;
+}
+
 export default function Dashboard({ rows }: { rows: Row[] }) {
   const [preset, setPreset] = useState<PresetId>("12m");
   const [custom, setCustom] = useState({ from: "", to: "" });
+  const [drill, setDrill] = useState<{ title: string; sub?: string; rows: Row[] } | null>(null);
 
   const range = useMemo(() => {
     const to = today();
@@ -78,6 +102,15 @@ export default function Dashboard({ rows }: { rows: Row[] }) {
     const months = { "3m": 3, "6m": 6, "12m": 12 }[preset];
     return { from: addMonths(to, months ? -months : 0), to };
   }, [preset, custom]);
+
+  const rangeLabel = useMemo(
+    () => (range.from ? `${range.from} to ${range.to}` : "All time"),
+    [range],
+  );
+
+  function selectSegment(title: string, segmentRows: Row[]) {
+    setDrill({ title, sub: rangeLabel, rows: segmentRows });
+  }
 
   const filtered = useMemo(
     () =>
@@ -106,60 +139,59 @@ export default function Dashboard({ rows }: { rows: Row[] }) {
     };
   }, [filtered]);
 
-  /* monthly (or yearly, for long ranges) count + spend buckets */
+  /* monthly (or yearly, for long ranges) count + spend buckets with rows */
   const timeline = useMemo(() => {
     const spanYears =
       range.from && range.to
         ? Number(range.to.slice(0, 4)) - Number(range.from.slice(0, 4)) + (range.from.slice(5, 7) !== range.to.slice(5, 7) ? 1 : 0)
         : 5;
     const granularity = spanYears > 2 ? "year" : "month";
-    const buckets = new Map<string, { key: string; count: number; spend: number }>();
+    const buckets = new Map<string, Row[]>();
     for (const r of filtered) {
-      const d = bagDate(r);
-      const key = granularity === "year" ? d.slice(0, 4) : d.slice(0, 7);
-      const b = buckets.get(key) ?? { key, count: 0, spend: 0 };
-      b.count += 1;
-      if (r.priceCents != null) b.spend += r.priceCents;
-      buckets.set(key, b);
+      const key = bagDate(r).slice(0, granularity === "year" ? 4 : 7);
+      const g = buckets.get(key) ?? [];
+      g.push(r);
+      buckets.set(key, g);
     }
-    return [...buckets.values()]
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .map((b) => ({ label: b.key, count: b.count, spend: b.spend }));
+    return [...buckets.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([key, g]) => ({
+        label: periodLabel(key),
+        value: g.length,
+        spend: g.reduce((n, r) => n + (r.priceCents ?? 0), 0),
+        rows: g,
+      }))
+      .map(({ spend, ...rest }) => ({ ...rest, spend }));
   }, [filtered, range]);
 
-  const roastDist = useMemo(() => {
+  const roastSegments = useMemo(() => {
     const levels = ["light", "medium-light", "medium", "medium-dark", "dark"];
-    const counts = countBy(filtered.map((r) => r.roastLevel ?? ""));
-    return levels
-      .map((l) => ({ label: l, value: counts.get(l) ?? 0 }))
-      .filter((x) => x.value > 0)
-      .concat(counts.get("") ?? 0 > 0 ? [{ label: "Unspecified", value: counts.get("") ?? 0 }] : []);
+    const out: Segment[] = [];
+    for (const l of levels) {
+      const g = filtered.filter((r) => r.roastLevel === l);
+      if (g.length > 0) out.push({ label: l, value: g.length, rows: g });
+    }
+    const unspecified = filtered.filter((r) => !r.roastLevel);
+    if (unspecified.length > 0) out.push({ label: "Unspecified", value: unspecified.length, rows: unspecified });
+    return out;
   }, [filtered]);
 
-  function categoryCounts(rows: Row[], get: (r: Row) => string | null, top: number) {
-    const counts = countBy(rows.map(get).filter((v): v is string => v !== null && v !== ""));
-    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-    const head = sorted.slice(0, top);
-    const rest = sorted.slice(top).reduce((n, [, c]) => n + c, 0);
-    if (rest > 0) head.push(["Other", rest] as [string, number]);
-    return head.map(([label, value]) => ({ label, value }));
-  }
-
-  const roasterDist = useMemo(() => categoryCounts(filtered, (r) => r.roaster, 8), [filtered]);
-  const originDist = useMemo(
-    () => categoryCounts(filtered, (r) => (r.origin ? r.origin.split(",")[0].trim() : null), 8),
+  const roasterSegments = useMemo(() => categorySegments(filtered, (r) => r.roaster, 8), [filtered]);
+  const originSegments = useMemo(
+    () => categorySegments(filtered, (r) => (r.origin ? r.origin.split(",")[0].trim() : null), 8),
     [filtered],
   );
-  const processDist = useMemo(() => categoryCounts(filtered, (r) => r.process, 6), [filtered]);
-  const ratingDist = useMemo(() => {
+  const processSegments = useMemo(() => categorySegments(filtered, (r) => r.process, 6), [filtered]);
+
+  const ratingSegments = useMemo(() => {
     const counts = countBy(filtered.filter((r) => r.rating != null).map((r) => r.rating as number));
-    return [1, 2, 3, 4, 5].map((n) => ({ label: "★".repeat(n), value: counts.get(n) ?? 0 })).filter((x) => x.value > 0);
+    return [1, 2, 3, 4, 5]
+      .map((n) => ({ label: "★".repeat(n), value: counts.get(n) ?? 0, rows: filtered.filter((r) => r.rating === n) }))
+      .filter((s) => s.value > 0);
   }, [filtered]);
 
-  const maxRoaster = Math.max(1, ...roasterDist.map((x) => x.value));
-  const maxOrigin = Math.max(1, ...originDist.map((x) => x.value));
-  const maxProcess = Math.max(1, ...processDist.map((x) => x.value));
-  const maxRating = Math.max(1, ...ratingDist.map((x) => x.value));
+  const decafRows = useMemo(() => filtered.filter((r) => r.decaffeinated), [filtered]);
+  const regularRows = useMemo(() => filtered.filter((r) => !r.decaffeinated), [filtered]);
 
   return (
     <div className="dashboard">
@@ -198,7 +230,7 @@ export default function Dashboard({ rows }: { rows: Row[] }) {
           {range.from ? ` · since ${range.from}` : ""}
           {range.to ? ` · through ${range.to}` : ""}
           <br />
-          Timeline uses roast date (purchase date when set, added date as a last resort).
+          Timeline uses roast date (purchase date when set, added date as a last resort). Click any bar or row to see its bags.
         </span>
       </div>
 
@@ -212,52 +244,77 @@ export default function Dashboard({ rows }: { rows: Row[] }) {
       </div>
 
       <div className="dash-grid">
-        <Card title="Bags per period" subtitle={timeline.length ? `${periodLabel(timeline[0].label)} — ${periodLabel(timeline[timeline.length - 1].label)}` : undefined}>
-          <HBars data={timeline.map((b) => ({ label: periodLabel(b.label), value: b.count }))} max={Math.max(1, ...timeline.map((b) => b.count))} />
+        <Card title="Bags per period" subtitle={timeline.length ? `${timeline[0].label} — ${timeline[timeline.length - 1].label}` : undefined}>
+          <HBars data={timeline.map(({ rows: tRows, ...s }) => ({ ...s, rows: tRows }))} onSelect={selectSegment} max={Math.max(1, ...timeline.map((b) => b.value))} />
         </Card>
 
         <Card title="Spend per period" subtitle="Total price of bags in each period">
-          <HBars data={timeline.map((b) => ({ label: periodLabel(b.label), value: b.spend }))} max={Math.max(1, ...timeline.map((b) => b.spend))} valueFmt={(v) => formatCents(v)} />
+          <HBars
+            data={timeline.map(({ rows: tRows, label, value }) => ({ label, value, rows: tRows }))}
+            onSelect={selectSegment}
+            max={Math.max(1, ...timeline.map((b) => b.spend))}
+            valueFmt={(v) => formatCents(v)}
+          />
         </Card>
 
         <Card title="Roasters" subtitle="Bags per roaster">
-          <HBars data={roasterDist.map((x) => ({ label: x.label, value: x.value }))} max={maxRoaster} />
+          <HBars data={roasterSegments} onSelect={selectSegment} max={Math.max(1, ...roasterSegments.map((x) => x.value))} />
         </Card>
 
         <Card title="Origins" subtitle="First country/region of origin">
-          <HBars data={originDist.map((x) => ({ label: x.label, value: x.value }))} max={maxOrigin} />
+          <HBars data={originSegments} onSelect={selectSegment} max={Math.max(1, ...originSegments.map((x) => x.value))} />
         </Card>
 
         <Card title="Roast levels">
-          <HBars data={roastDist.map((x) => ({ label: x.label, value: x.value }))} max={Math.max(1, ...roastDist.map((x) => x.value))} />
+          <HBars data={roastSegments} onSelect={selectSegment} max={Math.max(1, ...roastSegments.map((x) => x.value))} />
         </Card>
 
         <Card title="Process" subtitle="Processing methods">
-          <HBars data={processDist.map((x) => ({ label: x.label, value: x.value }))} max={maxProcess} />
+          <HBars data={processSegments} onSelect={selectSegment} max={Math.max(1, ...processSegments.map((x) => x.value))} />
         </Card>
 
         <Card title="Ratings">
-          {ratingDist.length === 0 ? (
+          {ratingSegments.length === 0 ? (
             <p className="dash-empty">No ratings recorded yet.</p>
           ) : (
             <div className="rating-bars">
-              {ratingDist.map((x) => (
-                <div key={x.label} className="rating-row">
+              {ratingSegments.map((x) => (
+                <button
+                  key={x.label}
+                  type="button"
+                  className="rating-row clickable"
+                  onClick={() => selectSegment(`Rated ${x.label}`, x.rows)}
+                >
                   <span className="rating-stars">{x.label}</span>
-                  <div className="rating-track">
-                    <div className="rating-fill" style={{ width: `${(x.value / maxRating) * 100}%` }} />
-                  </div>
+                  <span className="rating-track">
+                    <span className="rating-fill" style={{ width: `${(x.value / Math.max(1, ...ratingSegments.map((s) => s.value))) * 100}%` }} />
+                  </span>
                   <span className="rating-count">{x.value}</span>
-                </div>
+                </button>
               ))}
             </div>
           )}
         </Card>
 
         <Card title="Decaf vs regular">
-          <Donut total={stats.bags} decaf={stats.decaf} />
+          <Donut
+            total={stats.bags}
+            decaf={decafRows.length}
+            regular={regularRows.length}
+            onDecaf={() => selectSegment("Decaf", decafRows)}
+            onRegular={() => selectSegment("Regular", regularRows)}
+          />
         </Card>
       </div>
+
+      {drill ? (
+        <Drill
+          title={drill.title}
+          sub={drill.sub}
+          rows={drill.rows}
+          onClose={() => setDrill(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -285,29 +342,49 @@ function Card({ title, subtitle, children }: { title: string; subtitle?: string;
 function HBars({
   data,
   max,
+  onSelect,
   valueFmt = (v) => String(v),
 }: {
-  data: { label: string; value: number }[];
+  data: Segment[];
   max: number;
+  onSelect: (title: string, rows: Row[]) => void;
   valueFmt?: (v: number) => string;
 }) {
   if (data.length === 0) return <p className="dash-empty">Nothing in this period.</p>;
   return (
     <div className="hbars">
       {data.map((d) => (
-        <div key={d.label} className="hbar-row">
-          <span className="hbar-label" title={d.label}>{d.label}</span>
-          <div className="hbar-track">
-            <div className="hbar-fill" style={{ width: `${(d.value / max) * 100}%` }} title={`${d.label}: ${valueFmt(d.value)}`} />
-          </div>
+        <button
+          key={d.label}
+          type="button"
+          className="hbar-row clickable"
+          onClick={() => onSelect(d.label, d.rows)}
+          title={`${d.label}: ${valueFmt(d.value)} — click for the bags`}
+        >
+          <span className="hbar-label">{d.label}</span>
+          <span className="hbar-track">
+            <span className="hbar-fill" style={{ width: `${(d.value / max) * 100}%` }} />
+          </span>
           <span className="hbar-value">{valueFmt(d.value)}</span>
-        </div>
+        </button>
       ))}
     </div>
   );
 }
 
-function Donut({ total, decaf }: { total: number; decaf: number }) {
+function Donut({
+  total,
+  decaf,
+  regular,
+  onDecaf,
+  onRegular,
+}: {
+  total: number;
+  decaf: number;
+  regular: number;
+  onDecaf: () => void;
+  onRegular: () => void;
+}) {
   const pct = total > 0 ? (decaf / total) * 100 : 0;
   const r = 34;
   const circ = 2 * Math.PI * r;
@@ -330,8 +407,72 @@ function Donut({ total, decaf }: { total: number; decaf: number }) {
         </text>
       </svg>
       <div className="donut-legend">
-        <span><i className="dot" style={{ background: "var(--accent)" }} />Decaf — {decaf}</span>
-        <span><i className="dot" style={{ background: "var(--row-border)" }} />Regular — {total - decaf}</span>
+        <button type="button" className="legend-row clickable" onClick={onDecaf}>
+          <i className="dot" style={{ background: "var(--accent)" }} />
+          Decaf — {decaf}
+        </button>
+        <button type="button" className="legend-row clickable" onClick={onRegular}>
+          <i className="dot" style={{ background: "var(--row-border)" }} />
+          Regular — {regular}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Drill({
+  title,
+  sub,
+  rows,
+  onClose,
+}: {
+  title: string;
+  sub?: string;
+  rows: Row[];
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="drill-overlay" onClick={onClose}>
+      <div className="drill-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
+        <div className="drill-head">
+          <div>
+            <h3 className="drill-title">{title}</h3>
+            {sub ? <p className="drill-sub">
+              {rows.length} bag{rows.length === 1 ? "" : "s"} · {sub}
+            </p> : null}
+          </div>
+          <button type="button" className="btn btn-small btn-secondary" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <div className="drill-list">
+          {rows.map((r) => (
+            <Link key={r.id} href={`/coffees/${r.id}`} className="drill-item">
+              {r.photoFile ? (
+                <img src={`/api/photos/${r.photoFile}`} alt="" className="drill-thumb" />
+              ) : (
+                <span className="drill-thumb drill-thumb-empty" />
+              )}
+              <span className="drill-name">
+                {r.name}
+                <span className="drill-sub-line">{r.roaster}</span>
+              </span>
+              <span className="drill-meta">
+                <span>{bagDate(r)}</span>
+                <span>{r.priceCents != null ? formatCents(r.priceCents) : ""}{r.weightGrams ? ` · ${r.weightGrams} g` : ""}</span>
+                {r.rating != null ? <span className="stars">{"★".repeat(r.rating)}</span> : null}
+              </span>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );

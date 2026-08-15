@@ -10,6 +10,7 @@ export default async function DashboardPage() {
   const rows = await db
     .select({
       id: coffees.id,
+      name: coffees.name,
       roaster: coffees.roaster,
       origin: coffees.origin,
       process: coffees.process,
@@ -21,6 +22,7 @@ export default async function DashboardPage() {
       weightGrams: coffees.weightGrams,
       rating: coffees.rating,
       decaffeinated: coffees.decaffeinated,
+      photoFile: coffees.photoFile,
     })
     .from(coffees)
     .orderBy(desc(coffees.roastDate));
