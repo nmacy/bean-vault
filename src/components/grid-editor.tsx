@@ -122,9 +122,13 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
   const [filters, setFilters] = useState({ search: "", roaster: "", roast: "", rating: "" });
 
   const rowsRef = useRef(rows);
-  rowsRef.current = rows;
   const draftsRef = useRef(drafts);
-  draftsRef.current = drafts;
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
+  useEffect(() => {
+    draftsRef.current = drafts;
+  }, [drafts]);
   const savingRef = useRef(new Set<number>());
   const pendingRef = useRef(new Set<number>());
   const findingRef = useRef(new Set<number>());
@@ -435,10 +439,10 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
                       <button
                         type="button"
                         className="btn btn-small btn-secondary"
-                        disabled={findingRef.current.has(row.id)}
+                        disabled={status?.kind === "finding"}
                         onClick={() => void tryFindPhoto(row.id)}
                       >
-                        {findingRef.current.has(row.id) ? "…" : "Find"}
+                        {status?.kind === "finding" ? "…" : "Find"}
                       </button>
                     )}
                   </td>
