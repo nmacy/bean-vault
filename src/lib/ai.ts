@@ -129,6 +129,20 @@ function agtronToRoast(n: number): string | null {
   return null;
 }
 
+/** Best-effort tasting notes straight from page text ("Tasting notes: sweet citrus…"). */
+function findTastingNotes(text: string): string | null {
+  const m = text.match(
+    /(?:tasting|flavor|flavour|cup)\s*(?:notes?|profile)\s*[:\u2014\-]?\s*([A-Za-z][^.;]{20,340})/i,
+  );
+  if (!m) return null;
+  let s = m[1].trim();
+  // stop at common page-layout words that follow the description
+  const stop = s.match(/\b(price|weight|size|add to cart|roast|altitude|origin|shipping)\b/i);
+  if (stop && stop.index !== undefined && stop.index > 20) s = s.slice(0, stop.index);
+  s = s.trim().replace(/\s{2,}/g, " ").replace(/\.$/, "");
+  return s.length >= 12 ? s : null;
+}
+
 /** "1,900–2,100 masl" (or ft) -> unit-less meters: "1,900–2,100". */
 function normalizeElevation(v: string): string | null {
   const t = v.trim();
@@ -202,7 +216,15 @@ function parseFields(data: unknown): AiCoffeeFields {
     roastLevel,
     mix,
     decaffeinated: decaf,
-    tastingNotes: cleanString(rec.tastingNotes ?? rec.tasting_notes),
+    tastingNotes: cleanString(
+      rec.tastingNotes ??
+        rec.tasting_notes ??
+        rec.tastingnote ??
+        rec.flavorNotes ??
+        rec.flavor_notes ??
+        rec.flavour_notes ??
+        rec.flavor,
+    ),
     description: cleanString(rec.description),
   };
 }
@@ -269,8 +291,10 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
               "level — convert feet if printed, e.g. \"1,900–2,100\"), process, " +
               "roastLevel (one of: light, medium-light, medium, medium-dark, dark), " +
               "agtron (the Agtron roast color number if listed, e.g. \"63\"), " +
-              "mix (blend or single-origin), decaffeinated (boolean), tastingNotes, " +
-              "description. Use null when the page does not say. If the page " +
+              "mix (blend or single-origin), decaffeinated (boolean), tastingNotes " +
+              "(flavor notes: one short sentence describing the taste, e.g. \"sweet citrus, " +
+              "jasmine and a syrupy body\"; null when the page has none), description. " +
+              "Use null when the page does not say. If the page " +
               "mentions bag size options, ignore them.",
           },
           { role: "user", content: `Store page URL: ${url}\n\nPage text:\n${text}` },
@@ -320,6 +344,7 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
   const fields = parseFields(parsed);
   // Deterministic fallbacks straight from the page text.
   if (!fields.elevation) fields.elevation = normalizeElevation(findElevation(text) ?? "");
+  if (!fields.tastingNotes) fields.tastingNotes = findTastingNotes(text);
   if (!fields.roastLevel) {
     const agtron = findAgtron(text);
     if (agtron !== null) fields.roastLevel = agtronToRoast(agtron);
