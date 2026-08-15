@@ -43,7 +43,8 @@ export default async function CoffeeDetailPage({ params }: { params: Promise<{ i
           ) : null}
 
           <dl className="fields">
-            {coffee.origin ? <><dt>Origin</dt><dd>{coffee.origin}</dd></> : null}
+            {coffee.country ? <><dt>Country</dt><dd>{coffee.country}</dd></> : null}
+            {coffee.region ? <><dt>Region</dt><dd>{coffee.region}</dd></> : null}
             {coffee.variety ? <><dt>Variety</dt><dd>{coffee.variety}</dd></> : null}
             {coffee.process ? <><dt>Process</dt><dd>{coffee.process}</dd></> : null}
             {coffee.roastLevel ? <><dt>Roast</dt><dd>{cap(coffee.roastLevel)}</dd></> : null}
@@ -63,6 +64,7 @@ export default async function CoffeeDetailPage({ params }: { params: Promise<{ i
           {coffee.notes ? <div className="notes">{coffee.notes}</div> : null}
 
           <div className="tags">
+            {coffee.mix === "blend" ? <span className="tag">Blend</span> : coffee.mix === "single-origin" ? <span className="tag">Single origin</span> : null}
             {coffee.decaffeinated ? <span className="tag">Decaf</span> : null}
             <span className="tag">Added {coffee.createdAt.toLocaleDateString()}</span>
           </div>

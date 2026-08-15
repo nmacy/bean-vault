@@ -28,7 +28,9 @@ export type GridRow = {
   id: number;
   roaster: string;
   name: string;
-  origin: string | null;
+  country: string | null;
+  region: string | null;
+  mix: string | null;
   variety: string | null;
   process: string | null;
   roastLevel: string | null;
@@ -41,6 +43,19 @@ export type GridRow = {
 };
 
 export type SaveGridResult = { saved: number; skipped?: number };
+
+function joinOrigin(country: string | null, region: string | null): string | null {
+  return [country, region].filter((v): v is string => v !== null && v.length > 0).join(", ") || null;
+}
+
+function splitOrigin(origin: string | null): { country: string | null; region: string | null } {
+  if (!origin) return { country: null, region: null };
+  const comma = origin.indexOf(",");
+  if (comma > 0) {
+    return { country: origin.slice(0, comma).trim() || null, region: origin.slice(comma + 1).trim() || null };
+  }
+  return { country: origin.trim() || null, region: null };
+}
 
 /** Batched "spreadsheet" save: full-row write per changed coffee in one transaction. */
 export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
@@ -59,7 +74,10 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
         .set({
           roaster,
           name,
-          origin: row.origin,
+          country: row.country,
+          region: row.region,
+          mix: row.mix,
+          origin: joinOrigin(row.country, row.region),
           variety: row.variety,
           process: row.process,
           roastLevel: row.roastLevel,
@@ -133,7 +151,9 @@ function collect(form: FormData) {
   return {
     roaster: requiredText(form, "roaster"),
     name: requiredText(form, "name"),
-    origin: text(form, "origin"),
+    country: text(form, "country"),
+    region: text(form, "region"),
+    mix: text(form, "mix"),
     variety: text(form, "variety"),
     process: text(form, "process"),
     roastLevel: text(form, "roastLevel"),
@@ -165,7 +185,10 @@ export async function createCoffee(_prev: FormState, formData: FormData): Promis
     .values({
       roaster: input.roaster,
       name: input.name,
-      origin: input.origin,
+      country: input.country,
+      region: input.region,
+      mix: input.mix,
+      origin: joinOrigin(input.country, input.region),
       variety: input.variety,
       process: input.process,
       roastLevel: input.roastLevel,
@@ -189,7 +212,9 @@ export async function createCoffee(_prev: FormState, formData: FormData): Promis
 
 function fields(input: Collected) {
   return {
-    origin: input.origin,
+    country: input.country,
+    region: input.region,
+    mix: input.mix,
     variety: input.variety,
     process: input.process,
     roastLevel: input.roastLevel,
@@ -229,6 +254,7 @@ export async function updateCoffee(id: number, _prev: FormState, formData: FormD
       roaster: input.roaster,
       name: input.name,
       ...fields(input),
+      origin: joinOrigin(input.country, input.region),
       photoFile: photo,
       updatedAt: new Date(),
     })
@@ -364,7 +390,10 @@ type BackupCoffee = {
   id?: unknown;
   roaster?: unknown;
   name?: unknown;
-  origin?: unknown;
+  origin?: unknown; // legacy combined value
+  country?: unknown;
+  region?: unknown;
+  mix?: unknown;
   variety?: unknown;
   process?: unknown;
   roastLevel?: unknown;
@@ -467,10 +496,15 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
     const updatedAt = backupDate(c.updatedAt) ?? new Date();
     const existing = await db.select().from(coffees).where(eq(coffees.id, id));
 
+    const backupCountry = backupStr(c.country) ?? splitOrigin(backupStr(c.origin)).country;
+    const backupRegion = backupStr(c.region) ?? splitOrigin(backupStr(c.origin)).region;
     const values = {
       roaster,
       name,
-      origin: backupStr(c.origin),
+      country: backupCountry,
+      region: backupRegion,
+      mix: backupStr(c.mix),
+      origin: joinOrigin(backupCountry, backupRegion),
       variety: backupStr(c.variety),
       process: backupStr(c.process),
       roastLevel: backupStr(c.roastLevel),
@@ -555,6 +589,9 @@ export async function importBeanVaultCsv(_prev: ImportState, formData: FormData)
     id: idx("id"),
     roaster: idx("roaster"),
     name: idx("name"),
+    country: idx("country"),
+    region: idx("region"),
+    mix: idx("mix"),
     origin: idx("origin"),
     variety: idx("variety"),
     process: idx("process"),
@@ -604,10 +641,23 @@ export async function importBeanVaultCsv(_prev: ImportState, formData: FormData)
       }
     }
 
+    const legacy = splitOrigin(csvCell(row, col.origin ?? -1));
+    const country =
+      col.country >= 0
+        ? csvCell(row, col.country) || null
+        : legacy.country;
+    const region =
+      col.region >= 0
+        ? csvCell(row, col.region) || null
+        : legacy.region;
+
     const values = {
       roaster,
       name,
-      origin: csvCell(row, col.origin) || null,
+      country,
+      region,
+      mix: csvCell(row, col.mix) || null,
+      origin: joinOrigin(country, region),
       variety: csvCell(row, col.variety) || null,
       process: csvCell(row, col.process) || null,
       roastLevel: csvCell(row, col.roastLevel) || null,

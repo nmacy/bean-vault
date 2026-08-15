@@ -12,7 +12,9 @@ export type BeanItem = {
   id: number;
   roaster: string;
   name: string;
-  origin: string | null;
+  country: string | null;
+  region: string | null;
+  mix: string | null;
   variety: string | null;
   process: string | null;
   roastLevel: string | null;
@@ -118,7 +120,8 @@ function Tiles({ beans }: { beans: BeanItem[] }) {
               <div className="roaster">{c.roaster}</div>
               <div className="tags">
                 {c.decaffeinated ? <span className="tag">Decaf</span> : null}
-                {c.origin ? <span className="tag">{c.origin}</span> : null}
+                {c.mix === "blend" ? <span className="tag">Blend</span> : c.mix === "single-origin" ? <span className="tag">Single origin</span> : null}
+                {c.country ? <span className="tag">{c.country}{c.region ? ` - ${c.region}` : ""}</span> : null}
                 {c.roastLevel ? <span className="tag">{cap(c.roastLevel)}</span> : null}
                 {c.process ? <span className="tag">{c.process}</span> : null}
               </div>

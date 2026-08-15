@@ -10,7 +10,9 @@
 export type ImportedBean = {
   roaster: string;
   name: string;
-  origin: string | null;
+  country: string | null;
+  region: string | null;
+  mix: string | null;
   variety: string | null;
   process: string | null;
   roastLevel: string | null;
@@ -113,10 +115,15 @@ export function parseBeanconqueror(text: string): BeanconquerorImport {
       ? b.bean_information.filter((i): i is BeanInfo => typeof i === "object" && i !== null)
       : [];
 
-    const entryOrigins = infos
-      .map((i) => joinUnique(str(i.country), str(i.region)))
-      .filter((o) => o.length > 0);
-    const origin = [...new Set(entryOrigins)].join(", ") || null;
+    const country = joinUnique(...infos.map((i) => str(i.country))) || null;
+    const region = joinUnique(...infos.map((i) => str(i.region))) || null;
+    const rawMix = str(b.beanMix);
+    const mix =
+      rawMix === "BLEND"
+        ? "blend"
+        : rawMix === "SINGLE_ORIGIN"
+          ? "single-origin"
+          : null;
 
     const process = joinUnique(...infos.map((i) => str(i.processing))) || null;
 
@@ -154,7 +161,9 @@ export function parseBeanconqueror(text: string): BeanconquerorImport {
     out.push({
       roaster: str(b.roaster) ?? "Unknown",
       name,
-      origin,
+      country,
+      region,
+      mix,
       variety,
       process,
       roastLevel,

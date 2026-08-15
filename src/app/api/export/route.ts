@@ -21,7 +21,7 @@ export async function GET() {
   const rows = await db.select().from(coffees).orderBy(desc(coffees.createdAt));
 
   const header = [
-    "id", "roaster", "name", "origin", "variety", "process", "roast_level",
+    "id", "roaster", "name", "country", "region", "mix", "variety", "process", "roast_level",
     "roast_date", "purchase_date", "tasting_notes", "notes", "price_usd",
     "weight_grams", "rating", "decaffeinated", "photo", "added_at",
   ];
@@ -31,7 +31,9 @@ export async function GET() {
       String(r.id),
       r.roaster,
       r.name,
-      r.origin,
+      r.country,
+      r.region,
+      r.mix,
       r.variety,
       r.process,
       r.roastLevel,

@@ -4,7 +4,10 @@ export const coffees = sqliteTable("coffees", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   roaster: text("roaster").notNull(),
   name: text("name").notNull(),
-  origin: text("origin"),
+  origin: text("origin"), // legacy combined value, kept for back-compat
+  country: text("country"),
+  region: text("region"),
+  mix: text("mix"), // "single-origin" | "blend"
   variety: text("variety"),
   process: text("process"),
   roastLevel: text("roast_level"),

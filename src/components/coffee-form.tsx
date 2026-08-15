@@ -37,8 +37,20 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
             <input id="name" name="name" required defaultValue={coffee?.name ?? ""} placeholder="e.g. Southern Weather" />
           </div>
           <div className="field">
-            <label htmlFor="origin">Origin</label>
-            <input id="origin" name="origin" defaultValue={coffee?.origin ?? ""} placeholder="Country or region" />
+            <label htmlFor="country">Country</label>
+            <input id="country" name="country" defaultValue={coffee?.country ?? ""} placeholder="e.g. Colombia" />
+          </div>
+          <div className="field">
+            <label htmlFor="region">Region</label>
+            <input id="region" name="region" defaultValue={coffee?.region ?? ""} placeholder="e.g. Santa Monica" />
+          </div>
+          <div className="field">
+            <label htmlFor="mix">Type</label>
+            <select id="mix" name="mix" defaultValue={coffee?.mix ?? ""}>
+              <option value="">—</option>
+              <option value="single-origin">Single origin</option>
+              <option value="blend">Blend</option>
+            </select>
           </div>
           <div className="field">
             <label htmlFor="variety">Variety</label>

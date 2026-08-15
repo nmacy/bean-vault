@@ -8,7 +8,9 @@ import { formatCents } from "@/lib/format";
 type Cell = {
   roaster: string;
   name: string;
-  origin: string;
+  country: string;
+  region: string;
+  mix: string;
   variety: string;
   process: string;
   roastLevel: string;
@@ -26,14 +28,16 @@ type Status = { kind: "saving" | "saved" | "finding" | "error"; msg?: string };
 const ROAST_LEVELS = ["light", "medium-light", "medium", "medium-dark", "dark"];
 const ROAST_ORDER = new Map(ROAST_LEVELS.map((l, i) => [l, i]));
 
-const TEXT_FIELDS: (keyof Cell)[] = ["roaster", "name", "origin", "variety", "process"];
+const TEXT_FIELDS: (keyof Cell)[] = ["roaster", "name", "country", "region", "variety", "process"];
 
 const COLUMNS: { key: string; label: string }[] = [
   { key: "roaster", label: "Roaster" },
   { key: "name", label: "Name" },
-  { key: "origin", label: "Origin" },
+  { key: "country", label: "Country" },
+  { key: "region", label: "Region" },
   { key: "variety", label: "Variety" },
   { key: "process", label: "Process" },
+  { key: "mix", label: "Type" },
   { key: "roastLevel", label: "Roast" },
   { key: "roastDate", label: "Roast date" },
   { key: "purchaseDate", label: "Purchased" },
@@ -66,7 +70,9 @@ function toCell(row: GridRow): Cell {
   return {
     roaster: row.roaster ?? "",
     name: row.name ?? "",
-    origin: row.origin ?? "",
+    country: row.country ?? "",
+    region: row.region ?? "",
+    mix: row.mix ?? "",
     variety: row.variety ?? "",
     process: row.process ?? "",
     roastLevel: row.roastLevel ?? "",
@@ -85,7 +91,9 @@ function toPayload(row: BaseRow, cell: Cell): GridRow {
     id: row.id,
     roaster: cell.roaster.trim(),
     name: cell.name.trim(),
-    origin: cell.origin.trim() || null,
+    country: cell.country.trim() || null,
+    region: cell.region.trim() || null,
+    mix: cell.mix || null,
     variety: cell.variety.trim() || null,
     process: cell.process.trim() || null,
     roastLevel: cell.roastLevel || null,
@@ -370,7 +378,7 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
   const visible = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
     let list = rows.filter(({ row, cell }) => {
-      if (q && ![cell.roaster, cell.name, cell.origin, cell.variety, cell.process].some((f) => f.toLowerCase().includes(q))) {
+      if (q && ![cell.roaster, cell.name, cell.country, cell.region, cell.variety, cell.process].some((f) => f.toLowerCase().includes(q))) {
         return false;
       }
       if (filters.roaster && row.roaster !== filters.roaster) return false;
@@ -474,8 +482,20 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
             />
           </td>
         );
-      case "origin":
-        return <td><input value={cellValue(row.id, "origin")} onChange={(e) => setCell(row.id, "origin", e.target.value)} onBlur={() => handleBlur(row.id, "origin")} /></td>;
+      case "country":
+        return <td><input value={cellValue(row.id, "country")} onChange={(e) => setCell(row.id, "country", e.target.value)} onBlur={() => handleBlur(row.id, "country")} /></td>;
+      case "region":
+        return <td><input value={cellValue(row.id, "region")} onChange={(e) => setCell(row.id, "region", e.target.value)} onBlur={() => handleBlur(row.id, "region")} /></td>;
+      case "mix":
+        return (
+          <td>
+            <select value={cellValue(row.id, "mix")} onChange={(e) => setCell(row.id, "mix", e.target.value)} onBlur={() => handleBlur(row.id, "mix")}>
+              <option value="">—</option>
+              <option value="single-origin">single-origin</option>
+              <option value="blend">blend</option>
+            </select>
+          </td>
+        );
       case "variety":
         return <td><input value={cellValue(row.id, "variety")} onChange={(e) => setCell(row.id, "variety", e.target.value)} onBlur={() => handleBlur(row.id, "variety")} /></td>;
       case "process":
@@ -537,7 +557,9 @@ function renderReadCell(row: BaseRow, key: string) {
     switch (key) {
       case "roaster": return text(row.roaster);
       case "name": return <td className="cell-name"><span className="cell-text">{row.name}</span></td>;
-      case "origin": return text(row.origin ?? "");
+      case "country": return text(row.country ?? "");
+      case "region": return text(row.region ?? "");
+      case "mix": return text(row.mix ?? "");
       case "variety": return text(row.variety ?? "");
       case "process": return text(row.process ?? "");
       case "roastLevel": return text(row.roastLevel ?? "");
@@ -556,7 +578,7 @@ function renderReadCell(row: BaseRow, key: string) {
       <div className="grid-toolbar">
         <input
           className="filter-search"
-          placeholder="Search roaster, name, origin…"
+          placeholder="Search roaster, name, country…"
           value={filters.search}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
         />

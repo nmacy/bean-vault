@@ -12,7 +12,7 @@ export default async function HomePage() {
       id: coffees.id,
       name: coffees.name,
       roaster: coffees.roaster,
-      origin: coffees.origin,
+      country: coffees.country,
       process: coffees.process,
       roastLevel: coffees.roastLevel,
       roastDate: coffees.roastDate,

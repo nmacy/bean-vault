@@ -22,6 +22,13 @@
       "when": 1786822895272,
       "tag": "0002_awesome_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1786828043393,
+      "tag": "0003_clever_lily_hollister",
+      "breakpoints": true
     }
   ]
 }

@@ -8,7 +8,7 @@ type Row = {
   id: number;
   name: string;
   roaster: string;
-  origin: string | null;
+  country: string | null;
   process: string | null;
   roastLevel: string | null;
   roastDate: string | null;
@@ -177,8 +177,8 @@ export default function Dashboard({ rows }: { rows: Row[] }) {
   }, [filtered]);
 
   const roasterSegments = useMemo(() => categorySegments(filtered, (r) => r.roaster, 8), [filtered]);
-  const originSegments = useMemo(
-    () => categorySegments(filtered, (r) => (r.origin ? r.origin.split(",")[0].trim() : null), 8),
+  const countrySegments = useMemo(
+    () => categorySegments(filtered, (r) => r.country, 8),
     [filtered],
   );
   const processSegments = useMemo(() => categorySegments(filtered, (r) => r.process, 6), [filtered]);
@@ -261,8 +261,8 @@ export default function Dashboard({ rows }: { rows: Row[] }) {
           <HBars data={roasterSegments} onSelect={selectSegment} max={Math.max(1, ...roasterSegments.map((x) => x.value))} />
         </Card>
 
-        <Card title="Origins" subtitle="First country/region of origin">
-          <HBars data={originSegments} onSelect={selectSegment} max={Math.max(1, ...originSegments.map((x) => x.value))} />
+        <Card title="Countries" subtitle="Country of origin">
+          <HBars data={countrySegments} onSelect={selectSegment} max={Math.max(1, ...countrySegments.map((x) => x.value))} />
         </Card>
 
         <Card title="Roast levels">
