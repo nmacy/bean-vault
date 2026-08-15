@@ -39,3 +39,28 @@ npm start
   with `npx drizzle-kit generate`, applied automatically on startup)
 
 Back up the whole `data/` directory. Local data is gitignored.
+
+## Docker (homelab)
+
+Build for the lab's `linux/amd64` (works from any host, e.g. an M-series Mac):
+
+```bash
+docker buildx build --platform linux/amd64 -t <your-registry>/coffee-tracker:latest .
+docker push <your-registry>/coffee-tracker:latest
+```
+
+Run on the lab (Deiban x64 + Docker):
+
+```sh
+docker run -d --name coffee-tracker -p 3000:3000 \
+  -v coffee-tracker-data:/app/data \
+  --restart unless-stopped \
+  <your-registry>/coffee-tracker:latest
+```
+
+or `docker compose up -d` using the included `docker-compose.yml`.
+
+- All persistence lives in the `/app/data` volume: SQLite DB (auto-migrated on
+  first start) plus uploaded photos. Back up that volume, not the container.
+- Runs as a non-root `node` user; listens on `:3000` (map to 80/443 with a
+  reverse proxy as you like).

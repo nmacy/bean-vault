@@ -1,0 +1,11 @@
+node_modules
+.next
+data
+Beanconqueror.json
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+scripts
+*.log
+.DS_Store
