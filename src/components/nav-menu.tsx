@@ -9,22 +9,14 @@ const GROUPS: { label: string; links: { href: string; label: string }[] }[] = [
     label: "Views",
     links: [
       { href: "/", label: "Dashboard" },
-      { href: "/coffees", label: "All coffees" },
-      { href: "/grid", label: "Grid" },
+      { href: "/coffees", label: "Coffees" },
     ],
   },
   {
     label: "Actions",
     links: [
       { href: "/new", label: "Add coffee" },
-      { href: "/import", label: "Import" },
-    ],
-  },
-  {
-    label: "Data",
-    links: [
-      { href: "/api/export", label: "Export CSV" },
-      { href: "/api/export/json", label: "Backup (with photos)" },
+      { href: "/data", label: "Data — import / export" },
     ],
   },
 ];

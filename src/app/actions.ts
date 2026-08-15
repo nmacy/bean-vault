@@ -73,7 +73,7 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
     }
   });
   revalidatePath("/"); revalidatePath("/coffees");
-  revalidatePath("/grid");
+  revalidatePath("/coffees");
   for (const row of rows) revalidatePath(`/coffees/${row.id}`);
   return { saved, skipped: skipped > 0 ? skipped : undefined };
 }
@@ -283,7 +283,7 @@ export async function findCoffeePhoto(id: number): Promise<FindPhotoResult> {
 
   await db.update(coffees).set({ photoFile, updatedAt: new Date() }).where(eq(coffees.id, id));
   revalidatePath("/"); revalidatePath("/coffees");
-  revalidatePath("/grid");
+  revalidatePath("/coffees");
   revalidatePath(`/coffees/${id}`);
   return { ok: true, photoFile };
 }
@@ -347,7 +347,7 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
     .returning();
 
   revalidatePath("/"); revalidatePath("/coffees");
-  revalidatePath("/grid");
+  revalidatePath("/coffees");
   redirect(`/coffees/${row.id}`);
 }
 
@@ -503,7 +503,7 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
   }
 
   revalidatePath("/"); revalidatePath("/coffees");
-  revalidatePath("/grid");
+  revalidatePath("/coffees");
   revalidatePath("/dashboard");
   return {
     message: "Backup restored.",

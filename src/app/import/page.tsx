@@ -1,16 +1,5 @@
-import Link from "next/link";
-import ImportForm from "@/components/import-form";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Import · Bean Vault" };
-
-export default function ImportPage() {
-  return (
-    <main className="page">
-      <Link href="/coffees" className="back-link">← Back to all coffees</Link>
-      <div className="page-head">
-        <h1>Import from Beanconqueror</h1>
-      </div>
-      <ImportForm />
-    </main>
-  );
+export default function OldImportRoute() {
+  redirect("/data");
 }
