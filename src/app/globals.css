@@ -1703,3 +1703,7 @@ button.clickable {
   border-radius: 8px;
   background: var(--bg);
 }
+
+.settings-section {
+  margin-bottom: 24px;
+}
