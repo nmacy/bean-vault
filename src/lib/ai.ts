@@ -27,8 +27,34 @@ export type AiCoffeeFields = {
   description: string | null;
 };
 
+function decodeEntities(v: string): string {
+  return v.replace(/&(?:#0?39;|quot;|amp;|lt;|gt;|nbsp;|rsquo;|ldquo;|rdquo;)/g, (m) =>
+    ({ "&#39;": "'", "&#039;": "'", "&quot;": '"', "&amp;": "&", "&lt;": "<", "&gt;": ">", "&nbsp;": " ", "&rsquo;": "’", "&ldquo;": "“", "&rdquo;": "”" })[m] ?? m,
+  );
+}
+
+function flattenLd(value: unknown, out: string[]): void {
+  if (typeof value === "string") out.push(decodeEntities(value));
+  else if (Array.isArray(value)) for (const v of value) flattenLd(v, out);
+  else if (typeof value === "object" && value !== null) {
+    for (const v of Object.values(value)) flattenLd(v, out);
+  }
+}
+
 function htmlToText(html: string): string {
-  return html
+  const extras: string[] = [];
+  // JSON-LD (product schema) is where many JS-rendered stores keep the real copy.
+  for (const m of html.matchAll(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      flattenLd(JSON.parse(m[1]), extras);
+    } catch {
+      extras.push(m[1].replace(/<[^>]+>/g, " "));
+    }
+  }
+  const desc = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)/i);
+  if (desc) extras.push(desc[1].replace(/&amp;/g, "&"));
+
+  const content = html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
@@ -40,12 +66,13 @@ function htmlToText(html: string): string {
     .replace(/&#0?39;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
+    .concat(" ", extras.join(" "))
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, MAX_PAGE_CHARS);
+    .trim();
+  return content.slice(0, MAX_PAGE_CHARS);
 }
 
-async function fetchPageText(url: string): Promise<string | null> {
+export async function fetchPageText(url: string): Promise<string | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), PAGE_FETCH_TIMEOUT_MS);
   try {
@@ -141,6 +168,40 @@ function findTastingNotes(text: string): string | null {
   if (stop && stop.index !== undefined && stop.index > 20) s = s.slice(0, stop.index);
   s = s.trim().replace(/\s{2,}/g, " ").replace(/\.$/, "");
   return s.length >= 12 ? s : null;
+}
+
+/** Page metadata for feed-less stores: og:title (or <title>) and og:image. */
+export async function fetchPageMeta(
+  url: string,
+): Promise<{ title: string | null; image: string | null }> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), PAGE_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "coffee-tracker/0.1 (personal coffee log)" },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return { title: null, image: null };
+    const html = await res.text();
+    const meta = (name: string) => {
+      const m = html.match(
+        new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)`, "i"),
+      );
+      return m ? m[1].replace(/&amp;/g, "&").trim() : null;
+    };
+    let title = meta("og:title") ?? html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ?? null;
+    if (title) {
+      // Drop trailing brand bits: "Colombia Villa Betulia | S&W Craft Roasting"
+      const parts = title.split(/\s[|\u2014\u2013\u2012-]\s/);
+      title = parts[0].trim();
+      if (!title) title = null;
+    }
+    return { title, image: meta("og:image") };
+  } catch {
+    return { title: null, image: null };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** "1,900–2,100 masl" (or ft) -> unit-less meters: "1,900–2,100". */

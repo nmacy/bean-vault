@@ -10,7 +10,7 @@ import { dateField, dollarsToCents, elevationField, intField, photoFile as readP
 import { parseBeanconqueror } from "@/lib/beanconqueror";
 import { bestMatch, lookupProductPage, storeFor, storeProducts, type StoreProductDetail } from "@/lib/storefinder";
 import { parseCsv } from "@/lib/csv";
-import { DEFAULT_MODEL, enrichCoffeePage, type AiCoffeeFields } from "@/lib/ai";
+import { DEFAULT_MODEL, enrichCoffeePage, fetchPageMeta, type AiCoffeeFields } from "@/lib/ai";
 import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -347,14 +347,17 @@ export async function findCoffeePhoto(id: number): Promise<FindPhotoResult> {
 /* ---------- add by store link ---------- */
 
 export type LinkLookupResult =
-  | { ok: true; url: string; product: StoreProductDetail }
+  | { ok: true; url: string; product: StoreProductDetail; aiOnly?: boolean }
   | { ok: false; message: string };
 
 /** Resolve a store product URL to product + purchase options (bag sizes). */
 export async function lookupProductLink(url: string): Promise<LinkLookupResult> {
   const result = await lookupProductPage(url);
-  if ("error" in result) return { ok: false, message: result.error };
-  return { ok: true, url, product: result };
+  if (!("error" in result)) return { ok: true, url, product: result };
+  // No feed: read the page directly (og:title/og:image). Ask AI later for details.
+  const fallback = await aiPageProduct(url);
+  if (!fallback) return { ok: false, message: result.error };
+  return { ok: true, url, product: fallback, aiOnly: true };
 }
 
 export async function createCoffeeFromLink(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -363,10 +366,14 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
   if (!url || variantIndex === null) return { message: "Missing product link or bag choice." };
 
   // Re-resolve the product server-side (authoritative; the client only offers choices).
+  // Feed-less stores fall back to the page's own metadata and form values.
   const page = await lookupProductPage(url);
-  if ("error" in page) return { message: page.error };
-  const variant = page.variants[variantIndex];
-  if (!variant) return { message: "That bag option is not available." };
+  let variant: { priceCents: number | null; weightGrams: number | null } | null = null;
+  if (!("error" in page) && page.variants[variantIndex]) {
+    variant = page.variants[variantIndex];
+  } else if (!("error" in page)) {
+    return { message: "That bag option is not available." };
+  }
 
   const nameOverride = text(formData, "name");
   const priceOverride = dollarsToCents(formData, "price");
@@ -390,14 +397,22 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
   const tastingNotes = text(formData, "tastingNotes");
   const decaf = formData.get("decaffeinated") === "on";
   const aiUsed = formData.get("aiUsed") === "on";
-  const roaster = requiredText(formData, "roaster") ?? page.roaster;
-  const name = nameOverride ?? page.name;
+  const roaster = requiredText(formData, "roaster") ?? ("error" in page ? null : page.roaster);
+  const name = nameOverride ?? ("error" in page ? null : page.name);
   if (!name) return { message: "Coffee name is required." };
   if (!roaster) return { message: "Roaster is required." };
 
+  let pageImage: string | null = null;
+  if ("error" in page) {
+    const meta = await fetchPageMeta(url);
+    pageImage = meta.image;
+  } else {
+    pageImage = page.imageUrl;
+  }
+
   let photoFile: string | null = null;
-  if (page.imageUrl) {
-    const image = await downloadRemoteImage(page.imageUrl);
+  if (pageImage) {
+    const image = await downloadRemoteImage(pageImage);
     if (image) {
       try {
         photoFile = await savePhotoBytes(image.data, image.ext);
@@ -425,8 +440,8 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
       tastingNotes,
       decaffeinated: decaf,
       aiEnriched: aiUsed,
-      priceCents: priceOverride ?? variant.priceCents ?? null,
-      weightGrams: weightOverride ?? variant.weightGrams ?? null,
+      priceCents: priceOverride ?? variant?.priceCents ?? null,
+      weightGrams: weightOverride ?? variant?.weightGrams ?? null,
       notes: text(formData, "notes"),
       photoFile,
       createdAt: now,
@@ -778,6 +793,24 @@ export async function importBeanVaultCsv(_prev: ImportState, formData: FormData)
 
 /* ---------- AI enrichment (OpenRouter) ---------- */
 
+
+function roasterFromHost(host: string): string {
+  const label = (host.split(".")[0] || host).replace(/[-_]/g, " ");
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+/** Feed-less store: build a minimal product from the page's own metadata. */
+async function aiPageProduct(url: string): Promise<StoreProductDetail | null> {
+  const meta = await fetchPageMeta(url);
+  if (!meta.title && !meta.image) return null;
+  const host = new URL(url).hostname.replace(/^www\./, "");
+  return {
+    roaster: roasterFromHost(host),
+    name: meta.title ?? "Coffee",
+    imageUrl: meta.image,
+    variants: [{ id: "default", label: "Default", priceCents: null, weightGrams: null }],
+  };
+}
 
 export type AiEnrichResult =
   | { ok: true; fields: AiCoffeeFields }

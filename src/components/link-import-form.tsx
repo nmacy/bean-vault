@@ -34,6 +34,7 @@ export default function LinkImportForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [product, setProduct] = useState<Extract<LinkLookupResult, { ok: true }>["product"] | null>(null);
+  const [aiOnly, setAiOnly] = useState(false);
   const [variantIndex, setVariantIndex] = useState(0);
   const [price, setPrice] = useState("");
   const [weight, setWeight] = useState("");
@@ -44,6 +45,7 @@ export default function LinkImportForm() {
   const [state, formAction, isPending] = useActionState(createCoffeeFromLink, {});
 
   // AI-filled, editable fields
+  const [roaster, setRoaster] = useState("");
   const [country, setCountry] = useState("");
   const [region, setRegion] = useState("");
   const [variety, setVariety] = useState("");
@@ -66,6 +68,7 @@ export default function LinkImportForm() {
     setError(null);
     setProduct(null);
     setAiNote(null);
+    setAiOnly(false);
     const res = await lookupProductLink(trimmed);
     setBusy(false);
     if (!res.ok) {
@@ -73,6 +76,8 @@ export default function LinkImportForm() {
       return;
     }
     setProduct(res.product);
+    setRoaster(res.product.roaster);
+    setAiOnly(res.aiOnly === true);
     const first = res.product.variants[0];
     setVariantIndex(0);
     setPrice(first?.priceCents != null ? (first.priceCents / 100).toFixed(2) : "");
@@ -177,13 +182,26 @@ export default function LinkImportForm() {
           {state.message ? <div className="form-error">{state.message}</div> : null}
           <input type="hidden" name="url" value={url.trim()} />
           <input type="hidden" name="variantIndex" value={variantIndex} />
-          <input type="hidden" name="roaster" value={product.roaster} />
+
+          {aiOnly ? (
+            <p className="form-error" style={{ marginBottom: 14 }}>
+              This store has no product feed, so the bag info comes from reading the page
+              itself — check the details, and use &quot;Ask AI to fill details&quot; below for the rest.
+            </p>
+          ) : null}
 
           <div className="link-product">
             {product.imageUrl ? <img src={product.imageUrl} alt="" className="link-thumb" /> : null}
             <div>
               <div className="link-roaster">{product.roaster}</div>
               <div className="link-name">{product.name}</div>
+            </div>
+          </div>
+
+          <div className="form-grid">
+            <div className="field wide">
+              <label htmlFor="link-roaster">Roaster</label>
+              <input id="link-roaster" name="roaster" value={roaster} onChange={(e) => setRoaster(e.target.value)} maxLength={120} />
             </div>
           </div>
 
