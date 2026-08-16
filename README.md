@@ -201,3 +201,28 @@ saves it in the local settings table — server-side only, never sent to the
 browser and never included in exports. Alternatively set `OPENROUTER_API_KEY`
 in `.env.local` (see `.env.example`) as a fallback. Optional
 `OPENROUTER_MODEL` overrides the default `openai/gpt-4o-mini`.
+
+## HTTP API
+
+Bearer-token JSON API — generate and revoke keys in **Settings → API access**
+(secrets are shown once; stored only as sha256 hashes).
+
+```
+Authorization: Bearer bv_…
+```
+
+| Endpoint | Method | Body | Meaning |
+|---|---|---|---|
+| `/api/v1/coffees` | GET | — | List all coffees |
+| `/api/v1/coffees` | POST | coffee fields | Create |
+| `/api/v1/coffees/:id` | GET | — | Get one |
+| `/api/v1/coffees/:id` | PATCH | fields to change | Merge-update (null clears a field) |
+| `/api/v1/coffees/:id` | DELETE | — | Delete (removes its photo file too) |
+
+Accepted fields: `roaster`, `name` (required on create), `country`, `region`,
+`mix` (`single-origin`|`blend`), `variety`, `producer`, `elevation` (numbers
+only), `process`, `roastLevel`, `roastDate`/`purchaseDate` (`YYYY-MM-DD`),
+`priceCents` (integer cents — no commas/units), `weightGrams`, `rating` (1–5),
+`notes`, `tastingNotes`, `decaffeinated` (boolean), `photoUrl` (downloads and
+stores the image). Errors return 4xx with `{ "error": … }`; validation
+failures include an `errors` array.

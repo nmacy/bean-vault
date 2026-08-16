@@ -5,7 +5,9 @@ import { settings } from "@/db/schema";
 import { openRouterModels } from "@/lib/ai";
 import SettingsForm from "@/components/settings-form";
 import ImportPanel from "@/components/import-panel";
+import ApiKeysForm from "@/components/api-keys-form";
 import { resolveAiKey, resolveAiModel } from "@/app/actions";
+import { readApiKeys } from "@/lib/api-auth";
 
 export const metadata = { title: "Settings · Bean Vault" };
 export const dynamic = "force-dynamic";
@@ -32,6 +34,7 @@ export default async function SettingsPage() {
   const availableModels = aiKey
     ? await openRouterModels().catch(() => [])
     : [];
+  const apiKeys = (await readApiKeys()).map(({ id, name, createdAt }) => ({ id, name, createdAt }));
 
   return (
     <main className="page page-narrow">
@@ -70,6 +73,8 @@ export default async function SettingsPage() {
         currentModel={savedModel}
         availableModels={availableModels}
       />
+
+      <ApiKeysForm keys={apiKeys} />
     </main>
   );
 }

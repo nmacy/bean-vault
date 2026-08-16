@@ -11,6 +11,7 @@ import { parseBeanconqueror } from "@/lib/beanconqueror";
 import { bestMatch, lookupProductPage, storeFor, storeProducts, type StoreProductDetail } from "@/lib/storefinder";
 import { parseCsv } from "@/lib/csv";
 import { DEFAULT_MODEL, enrichCoffeePage, fetchPageMeta, type AiCoffeeFields } from "@/lib/ai";
+import { addApiKey as storeApiKey, revokeApiKey as dropApiKey } from "@/lib/api-auth";
 import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -978,4 +979,25 @@ export async function updateCoffeeFromLink(_prev: LinkUpdateState, formData: For
         : "The page had no new details for this coffee.",
     applied,
   };
+}
+
+/* ---------- API keys ---------- */
+
+
+export type ApiKeyState = { message?: string; ok?: boolean; key?: string };
+
+/** Mint a new API key; the plaintext secret is returned exactly once. */
+export async function generateApiKey(_prev: ApiKeyState, formData: FormData): Promise<ApiKeyState> {
+  const name = text(formData, "name") ?? "API key";
+  const { secret } = await storeApiKey(name.slice(0, 80));
+  revalidatePath("/settings");
+  return { ok: true, message: "Key generated — copy it now, it will not be shown again.", key: secret };
+}
+
+export async function revokeApiKey(_prev: ApiKeyState, formData: FormData): Promise<ApiKeyState> {
+  const id = text(formData, "id");
+  if (!id) return { message: "Missing key id." };
+  await dropApiKey(id);
+  revalidatePath("/settings");
+  return { ok: true, message: "API key revoked." };
 }
