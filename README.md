@@ -291,15 +291,73 @@ print(sum(c["priceCents"] or 0 for c in coffees) / 100, "spent in total")
 
 ### Field reference
 
-Accepted on create/PATCH: `roaster`, `name` (required on create), `country`,
-`region`, `mix` (`single-origin`|`blend`), `variety`, `producer`,
-`elevation` (numbers only, no units), `process`, `roastLevel` (light,
-medium-light, medium, medium-dark, dark), `roastDate`/`purchaseDate`
-(`YYYY-MM-DD`), `priceCents` (integer cents — no commas or units),
-`weightGrams`, `rating` (1–5), `notes`, `tastingNotes`, `decaffeinated`
-(boolean), `photoUrl` (server downloads and stores the image; `null` or empty
-removes it on PATCH). `origin` is always derived from `country` + `region`,
-never accepted directly.
+**Writable** (POST body / PATCH merge). Unknown keys are ignored; `null` or empty
+string clears a field on PATCH.
+
+| Key | Type | Constraints / format |
+|---|---|---|
+| `roaster` | `string` | 1–120 chars. **Required on create**; cannot be emptied via PATCH. |
+| `name` | `string` | 1–120 chars. **Required on create**; cannot be emptied via PATCH. |
+| `country` | `string \| null` | ≤ 80 chars. |
+| `region` | `string \| null` | ≤ 80 chars. |
+| `mix` | `"single-origin" \| "blend" \| null` | Strict enum. |
+| `variety` | `string \| null` | ≤ 120 chars. |
+| `producer` | `string \| null` | ≤ 120 chars. |
+| `elevation` | `string \| null` | Numbers only — digits, commas, dots, spaces and range dashes (`"1,900–2,100"`). No units/letters. ≤ 40 chars. |
+| `process` | `string \| null` | ≤ 80 chars. |
+| `roastLevel` | `"light" \| "medium-light" \| "medium" \| "medium-dark" \| "dark" \| null` | Strict enum. |
+| `roastDate` | `string \| null` | `YYYY-MM-DD`. |
+| `purchaseDate` | `string \| null` | `YYYY-MM-DD`. |
+| `priceCents` | `integer \| null` | Whole cents, 0–100,000,000 (e.g. `2600` = $26.00). **No commas or units.** |
+| `weightGrams` | `integer \| null` | 1–1,000,000. |
+| `rating` | `integer \| null` | 1–5. |
+| `notes` | `string \| null` | ≤ 4000 chars. |
+| `tastingNotes` | `string \| null` | ≤ 4000 chars. |
+| `decaffeinated` | `boolean` | Default `false`. |
+| `photoUrl` | `string \| null` | Write-only. POST: server downloads and stores the image. PATCH: replaces the photo; `null` or `""` removes it. Never returned. |
+
+**Read-only** (present in responses, not accepted in bodies):
+
+| Key | Type | Notes |
+|---|---|---|
+| `id` | `integer` | URI id (`/api/v1/coffees/:id`). |
+| `origin` | `string \| null` | Always derived from `country` + `region`; never accepted directly. |
+| `aiEnriched` | `boolean` | Set when the AI assisted an entry. |
+| `sourceUuid` | `string \| null` | Beanconqueror import id (dedupe). |
+| `photoFile` | `string \| null` | Stored photo filename; manage photos via `photoUrl`. |
+| `createdAt` / `updatedAt` | `string` (ISO 8601) | Server-managed timestamps. |
+
+**Sample response** (`GET /api/v1/coffees/:id`):
+
+```json
+{
+  "id": 121,
+  "roaster": "S&W Craft Roasting",
+  "name": "Colombia Villa Betulia Natural Gesha King",
+  "origin": "Colombia, Villa Betulia",
+  "country": "Colombia",
+  "region": "Villa Betulia",
+  "mix": "single-origin",
+  "variety": "Gesha",
+  "producer": "Wilfredo Daza",
+  "elevation": "1,900–2,100",
+  "process": "natural",
+  "roastLevel": "medium",
+  "roastDate": "2026-07-20",
+  "purchaseDate": null,
+  "priceCents": 2600,
+  "weightGrams": 340,
+  "rating": 5,
+  "notes": null,
+  "tastingNotes": "Sweet citrus, creamy body",
+  "decaffeinated": false,
+  "aiEnriched": true,
+  "sourceUuid": null,
+  "photoFile": "e1aae12834864876ad7c80ddc873f89f.jpg",
+  "createdAt": "2026-08-15T09:00:00.000Z",
+  "updatedAt": "2026-08-15T09:00:00.000Z"
+}
+```
 
 ### Errors
 
