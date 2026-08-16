@@ -204,25 +204,107 @@ in `.env.local` (see `.env.example`) as a fallback. Optional
 
 ## HTTP API
 
-Bearer-token JSON API — generate and revoke keys in **Settings → API access**
-(secrets are shown once; stored only as sha256 hashes).
+JSON API, secured with bearer keys. Generate and revoke keys in
+**Settings → API access** — a secret is shown exactly once, then only its
+sha256 hash is stored. The docs below assume `http://localhost:3000` and a
+key in the environment:
 
+```bash
+export BEAN_VAULT_URL=http://localhost:3000
+export BEAN_VAULT_KEY="bv_…"        # from Settings → API access
 ```
-Authorization: Bearer bv_…
+
+### Authentication
+
+Send the key on every request:
+
+```bash
+curl -H "Authorization: Bearer $BEAN_VAULT_KEY" "$BEAN_VAULT_URL/api/v1/coffees"
 ```
+
+Missing or invalid keys get `401 {"error":"Unauthorized"}`.
+
+### Endpoints
 
 | Endpoint | Method | Body | Meaning |
 |---|---|---|---|
-| `/api/v1/coffees` | GET | — | List all coffees |
+| `/api/v1/coffees` | GET | — | List all coffees (newest first) |
 | `/api/v1/coffees` | POST | coffee fields | Create |
-| `/api/v1/coffees/:id` | GET | — | Get one |
-| `/api/v1/coffees/:id` | PATCH | fields to change | Merge-update (null clears a field) |
-| `/api/v1/coffees/:id` | DELETE | — | Delete (removes its photo file too) |
+| `/api/v1/coffees/:id` | GET | — | Get one coffee |
+| `/api/v1/coffees/:id` | PATCH | fields to change | Merge-update; `null` clears a field |
+| `/api/v1/coffees/:id` | DELETE | — | Delete (also removes its photo file) |
 
-Accepted fields: `roaster`, `name` (required on create), `country`, `region`,
-`mix` (`single-origin`|`blend`), `variety`, `producer`, `elevation` (numbers
-only), `process`, `roastLevel`, `roastDate`/`purchaseDate` (`YYYY-MM-DD`),
-`priceCents` (integer cents — no commas/units), `weightGrams`, `rating` (1–5),
-`notes`, `tastingNotes`, `decaffeinated` (boolean), `photoUrl` (downloads and
-stores the image). Errors return 4xx with `{ "error": … }`; validation
-failures include an `errors` array.
+### Examples
+
+List coffees (pretty-print with `jq`):
+
+```bash
+curl -s -H "Authorization: Bearer $BEAN_VAULT_KEY" \
+  "$BEAN_VAULT_URL/api/v1/coffees" | jq '.[] | {id, name, roaster, priceCents}'
+```
+
+Add a coffee with a photo pulled from a product page:
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $BEAN_VAULT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "roaster": "S&W Craft Roasting",
+        "name": "Colombia Villa Betulia Natural Gesha King",
+        "country": "Colombia",
+        "region": "Villa Betulia",
+        "process": "natural",
+        "priceCents": 2600,
+        "weightGrams": 340,
+        "photoUrl": "https://…/image.jpeg"
+      }' \
+  "$BEAN_VAULT_URL/api/v1/coffees" | jq '{id, origin, priceCents}'
+```
+
+Update one field (or clear it with `"region": null`):
+
+```bash
+curl -s -X PATCH -H "Authorization: Bearer $BEAN_VAULT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"rating": 5, "tastingNotes": "Sweet citrus, creamy body"}' \
+  "$BEAN_VAULT_URL/api/v1/coffees/12" | jq '{rating, tastingNotes}'
+```
+
+Delete:
+
+```bash
+curl -s -X DELETE -H "Authorization: Bearer $BEAN_VAULT_KEY" \
+  "$BEAN_VAULT_URL/api/v1/coffees/12"   # -> {"ok":true}
+```
+
+From a script (Python, stdlib only):
+
+```python
+import json, urllib.request
+
+KEY = "bv_…"; URL = "http://localhost:3000/api/v1/coffees"
+
+req = urllib.request.Request(URL, headers={"Authorization": f"Bearer {KEY}"})
+coffees = json.load(urllib.request.urlopen(req))
+print(sum(c["priceCents"] or 0 for c in coffees) / 100, "spent in total")
+```
+
+### Field reference
+
+Accepted on create/PATCH: `roaster`, `name` (required on create), `country`,
+`region`, `mix` (`single-origin`|`blend`), `variety`, `producer`,
+`elevation` (numbers only, no units), `process`, `roastLevel` (light,
+medium-light, medium, medium-dark, dark), `roastDate`/`purchaseDate`
+(`YYYY-MM-DD`), `priceCents` (integer cents — no commas or units),
+`weightGrams`, `rating` (1–5), `notes`, `tastingNotes`, `decaffeinated`
+(boolean), `photoUrl` (server downloads and stores the image; `null` or empty
+removes it on PATCH). `origin` is always derived from `country` + `region`,
+never accepted directly.
+
+### Errors
+
+Non-2xx responses are JSON: `{"error": "…"}` — and validation failures add an
+`errors` array listing each problem, e.g.
+`422 {"error":"Validation failed.","errors":["priceCents must be an integer
+number of cents (no commas)."]}`. Common codes: 401 unauthenticated, 404 not
+found, 400 bad JSON, 422 validation.
