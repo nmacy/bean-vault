@@ -1785,3 +1785,21 @@ button.clickable {
   text-align: center;
   padding: 6px;
 }
+
+/* ---------- update from link ---------- */
+
+.update-link {
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.update-link-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}

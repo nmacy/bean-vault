@@ -55,6 +55,7 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
     <div className="form-card">
       {state.message ? <div className="form-error">{state.message}</div> : null}
       <form action={formAction}>
+        {removePhoto ? <input type="hidden" name="removePhoto" value="on" /> : null}
         <div className="form-grid">
           <div className="field">
             <label htmlFor="roaster">Roaster *</label>
@@ -167,7 +168,6 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
             </div>
           ) : photoHref ? (
             <div className="field wide">
-              {removePhoto ? <input type="hidden" name="removePhoto" value="on" /> : null}
               <span className="hint">Current photo:</span>
               <div className="current-photo">
                 {removePhoto ? (
@@ -181,17 +181,7 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
                     name="removePhoto"
                     value="on"
                     checked={removePhoto}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setRemovePhoto(checked);
-                      if (checked) {
-                        setCurrentPhoto(null);
-                        setPreview(null);
-                        if (fileRef.current) fileRef.current.value = "";
-                      } else {
-                        setCurrentPhoto(coffee?.photoFile ?? null);
-                      }
-                    }}
+                    onChange={(e) => setRemovePhoto(e.target.checked)}
                   />
                   Remove photo
                 </label>

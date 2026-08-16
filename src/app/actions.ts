@@ -873,3 +873,109 @@ export async function saveApiKey(_prev: SettingsState, formData: FormData): Prom
     .onConflictDoUpdate({ target: settings.key, set: { value } });
   return { message: "API key saved.", ok: true };
 }
+
+/* ---------- update existing coffee from a product link ---------- */
+
+export type LinkUpdateState = { message?: string; applied?: string[]; ok?: boolean };
+
+/**
+ * Re-read a coffee's product page and merge AI-extracted details into an
+ * existing coffee. Only fills fields the page actually provides: values the
+ * model returns as null/absent leave the coffee untouched, decaf is only set
+ * when the page confirms it, and an existing photo is never replaced.
+ */
+export async function updateCoffeeFromLink(_prev: LinkUpdateState, formData: FormData): Promise<LinkUpdateState> {
+  const id = intField(formData, "id", 1, 1_000_000_000);
+  const url = text(formData, "url");
+  if (id === null) return { message: "Missing coffee id." };
+  if (!url) return { message: "Paste a product link first." };
+
+  const [coffee] = await db.select().from(coffees).where(eq(coffees.id, id));
+  if (!coffee) return { message: "Coffee not found." };
+
+  const enriched = await aiEnrichProduct(url);
+  if (!enriched.ok) return { ok: false, message: enriched.message };
+  const f = enriched.fields;
+
+  const applied: string[] = [];
+  const changes: Partial<typeof coffees.$inferInsert> = { updatedAt: new Date() };
+
+  if (f.country && f.country !== coffee.country) {
+    changes.country = f.country;
+    applied.push("Country");
+  }
+  if (f.region && f.region !== coffee.region) {
+    changes.region = f.region;
+    applied.push("Region");
+  }
+  if (f.variety && f.variety !== coffee.variety) {
+    changes.variety = f.variety;
+    applied.push("Variety");
+  }
+  if (f.producer && f.producer !== coffee.producer) {
+    changes.producer = f.producer;
+    applied.push("Producer");
+  }
+  if (f.elevation && f.elevation !== coffee.elevation) {
+    changes.elevation = f.elevation;
+    applied.push("Elevation");
+  }
+  if (f.process && f.process !== coffee.process) {
+    changes.process = f.process;
+    applied.push("Process");
+  }
+  if (f.roastLevel && f.roastLevel !== coffee.roastLevel) {
+    changes.roastLevel = f.roastLevel;
+    applied.push("Roast");
+  }
+  if (f.mix && f.mix !== coffee.mix) {
+    changes.mix = f.mix;
+    applied.push("Type");
+  }
+  if (f.decaffeinated && !coffee.decaffeinated) {
+    changes.decaffeinated = true;
+    applied.push("Decaf");
+  }
+  if (f.tastingNotes && f.tastingNotes !== coffee.tastingNotes) {
+    changes.tastingNotes = f.tastingNotes;
+    applied.push("Tasting notes");
+  }
+
+  if (changes.country !== undefined || changes.region !== undefined) {
+    changes.origin = joinOrigin(changes.country ?? coffee.country, changes.region ?? coffee.region);
+  }
+
+  if (!coffee.photoFile) {
+    const meta = await fetchPageMeta(url);
+    if (meta.image) {
+      const image = await downloadRemoteImage(meta.image);
+      if (image) {
+        try {
+          changes.photoFile = await savePhotoBytes(image.data, image.ext);
+          applied.push("Photo");
+        } catch {
+          /* keep existing (none) */
+        }
+      }
+    }
+  }
+
+  changes.aiEnriched = true;
+
+  if (applied.length > 0) {
+    await db.update(coffees).set(changes).where(eq(coffees.id, id));
+    revalidatePath("/");
+    revalidatePath("/coffees");
+    revalidatePath(`/coffees/${id}`);
+    revalidatePath(`/coffees/${id}/edit`);
+  }
+
+  return {
+    ok: true,
+    message:
+      applied.length > 0
+        ? `Updated ${applied.length} field${applied.length === 1 ? "" : "s"}.`
+        : "The page had no new details for this coffee.",
+    applied,
+  };
+}

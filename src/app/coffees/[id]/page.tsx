@@ -7,6 +7,7 @@ import { formatCents, photoUrl } from "@/lib/format";
 import { cap } from "@/lib/cap";
 import DeleteButton from "@/components/delete-button";
 import FindPhotoButton from "@/components/find-photo-button";
+import UpdateFromLink from "@/components/update-from-link";
 
 export const metadata = { title: "Coffee · Bean Vault" };
 export const dynamic = "force-dynamic";
@@ -77,6 +78,8 @@ export default async function CoffeeDetailPage({ params }: { params: Promise<{ i
             {!coffee.photoFile ? <FindPhotoButton id={coffee.id} /> : null}
             <DeleteButton id={coffee.id} />
           </div>
+
+          <UpdateFromLink id={coffee.id} />
         </div>
       </div>
     </main>
