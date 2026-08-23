@@ -262,7 +262,7 @@ export default function Dashboard({ rows }: { rows: Row[] }) {
 
         <Card title="Spend per period" subtitle="Total price of bags in each period">
           <HBars
-            data={timeline.map(({ rows: tRows, label, value }) => ({ label, value, rows: tRows }))}
+            data={timeline.map(({ rows: tRows, label, spend }) => ({ label, value: spend, rows: tRows }))}
             onSelect={selectSegment}
             max={Math.max(1, ...timeline.map((b) => b.spend))}
             valueFmt={(v) => formatCents(v)}
