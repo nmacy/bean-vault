@@ -2,31 +2,46 @@
 
 A personal web app for tracking the coffee you buy. Every bag gets its roaster,
 origin, variety, process, roast level, roast and purchase dates, price, weight,
-rating, notes — and a photo snapshot. Built to run on your own machine or a
-homelab server; all data stays on your disk.
+rating, notes, a photo snapshot — and a lifecycle (resting → frozen → opened →
+empty) that tracks resting days, open days and time in the freezer. Built to
+run on your own machine or a homelab server; all data stays on your disk.
 
 ## Features
 
-- **Bag collection** — add a coffee with all relevant fields plus a photo
-  upload (live preview, 10 MB cap, JPG/PNG/WebP/AVIF/GIF).
-- **Card grid home page** — every bag as a tile with its photo, tags, price,
-  weight and rating; click through to the detail page.
-- **Spreadsheet grid editing** (`/grid`) — edit any number of coffees in a
-  table. Cells **auto-save when you leave them**, with live forced formatting
-  and validation:
+- **Dashboard home** — stats over your whole collection with a time-range
+  selector (last 3/6/12 months, this year, all time, or custom). Bags, total
+  spend, average/median price, total weight, average rating, decaf share, a
+  roast-date timeline, and breakdowns by roaster, country, roast level,
+  process, rating and blend/single-origin — every segment drills down to the
+  bags behind it.
+- **Bag collection** (`/coffees`) — a tiles view of every bag with its photo,
+  tags, price, weight and rating. Click through to the detail page.
+- **Spreadsheet grid editing** (`/coffees`, grid view) — toggle between tiles
+  and a table to edit any number of coffees. Cells **auto-save when you leave
+  them**, with live forced formatting and validation:
   - price accepts only digits and a single `.`, and `25` becomes `25.00`;
   - weight accepts digits only;
   - roaster/name cannot be emptied;
-  - unsaved edits trigger a leave-page warning.
-  - Sort by clicking column headers; filter by search text, roaster, roast
-    level, rating, and **year** (roast year, purchase year as fallback).
+  - unsaved edits trigger a leave-page warning;
+  - sort by clicking column headers; show/hide columns; filter by search text,
+    roaster, roast level, rating, year (roast year, purchase year as fallback)
+    and decaf. Columns, sort and filters persist between visits.
+- **Bag lifecycle** — each bag is `resting` by default and moves through a
+  small state machine: `resting ⇄ frozen`, `resting → opened`, `frozen →
+  empty`, `opened → frozen`, and `opened → empty`; emptying is undoable back
+  to `resting`. The app tracks **resting days** (since roast, minus time
+  frozen), **open days**, and cumulative **frozen days**. You can also
+  re-freeze an opened bag — freezing pauses the resting clock.
+- **Add by store link** — paste a roaster product URL and the app resolves the
+  product page to its name, origin facts, and purchase options (bag sizes).
 - **Photo auto-find** — bags without a snapshot can pull the real product
   image from the roaster's own store page (Shopify or WooCommerce product
   feeds, fuzzy-matched by name, tolerant of typos like "Guatamala" →
   "Guatemala"). One at a time, or a batch run for every missing photo.
-- **Beanconqueror import** — bring in your existing history from a
-  Beanconqueror JSON export. Re-importing the same file is safe: beans are
-  matched by their source UUID and imports that already exist are skipped.
+- **Import** — Beanconqueror JSON export, Bean Vault JSON backup (photos
+  included), or Bean Vault CSV.
+- **Export** — a JSON backup with every photo embedded (restores into Bean
+  Vault), or a CSV table for spreadsheets.
 - **Single-user by design** — no accounts, no cloud, no telemetry.
 
 ## Tech stack
@@ -92,12 +107,38 @@ Notes:
   `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` / `TZ` through from `.env`
   (copy `.env.example`) and mounts the persistent `bean-vault-data` volume.
 
+## Bag lifecycle
+
+A bag is `resting` by default and moves through a small, intentional state
+machine (`src/lib/status.ts`). Transitions from → to:
+
+| From | To |
+|---|---|
+| `resting` | `frozen` (freeze), `opened` (open) |
+| `frozen` | `resting` (unfreeze), `empty` |
+| `opened` | `frozen` (freeze), `empty` |
+| `empty` | `resting` (undo) |
+
+- `resting` — the default. Resting days = days since roast, minus any time
+  frozen. Stops accumulating once the bag is emptied.
+- `frozen` — pauses the resting clock; cumulative `frozenDays` is recorded.
+  Unfreezing resumes resting.
+- `opened` — tracks open days from `openedAt`. An opened bag can still be
+  frozen.
+- `empty` — terminal (set `emptiedAt`). Empties can be undone back to
+  `resting`.
+
+Transitioning happens on the coffee detail page; the button label reflects the
+action (Freeze / Unfreeze / Open / Empty / Resting).
+
 ## Importing from Beanconqueror
 
+Imports live in **Settings → Import**.
+
 1. In the Beanconqueror app: **Settings → Data & Storage → Export to JSON**.
-2. In Bean Vault: **Import** (header) → choose the file → Import beans.
-3. The result screen shows how many beans were imported, how many were skipped
-   as already present, and whether the export contained any photos.
+2. In Bean Vault: **Settings → Import → Beanconqueror** → choose the file.
+3. The result shows how many beans were imported, how many were skipped as
+   already present, and whether the export contained any photos.
 
 What maps over (max 50 MB file):
 
@@ -148,6 +189,16 @@ if a roaster enables a feed.
 - The whole `data/` directory is **gitignored** — it is your only copy.
   Back it up (the file is a single SQLite DB plus an images folder).
 
+Beyond copying the volume, the app itself can get your data out and back in
+(**Settings → Data / Import**):
+
+- **Backup (JSON)** — `GET /api/export/json`. Every coffee plus its photo
+  embedded as base64. Restoring the same file is idempotent (rows upsert by
+  id; rows missing from the backup are left untouched).
+- **CSV** — `GET /api/export`. The plain table for spreadsheets. The CSV
+  import honors an `id` column to update existing rows; photo names are only
+  restored when the file is already present in `data/uploads/`.
+
 Schema lives in `src/db/schema.ts`; migration SQL lives in `drizzle/` and is
 applied automatically on startup. After changing the schema, regenerate with
 `npx drizzle-kit generate`.
@@ -157,16 +208,23 @@ applied automatically on startup. After changing the schema, regenerate with
 ```
 src/
   app/
-    page.tsx                 # card grid home
-    new/                     # add a coffee (photo upload form)
-    grid/                    # spreadsheet editing: autosave, sort, filters
-    import/                  # Beanconqueror JSON import
-    coffees/[id]/            # detail view (+ edit page)
-    api/photos/[name]/       # serves uploaded photos
-    actions.ts               # server actions (create/update/delete/import/find)
-  components/                # grid editor, forms, buttons
+    page.tsx                 # dashboard home (stats + analytics)
+    layout.tsx               # header, nav menu, theme bootstrap
+    new/                     # add a coffee (form + add-by-link)
+    coffees/
+      page.tsx               # collection: tiles + grid editing views
+      [id]/                  # detail view (lifecycle, fields, notes)
+      [id]/edit/             # edit a coffee
+    settings/                # data export/import, AI key, API keys
+    actions.ts               # server actions (create/update/delete/status/import/find)
+    api/
+      v1/coffees/            # REST API (list/create/update/delete)
+      photos/[name]/         # serves uploaded photos
+      export/                # CSV export
+      export/json/           # JSON backup (photos embedded)
+  components/                # dashboard, collection, grid editor, forms, toggles
   db/                        # schema + SQLite client (auto-migrates)
-  lib/                       # parsers, validation, photo + storefront lookup
+  lib/                       # parsers, validation, photo + storefront lookup, AI
 docker-compose.yml           # homelab compose config
 Dockerfile                   # multi-stage, standalone output (~90 MB)
 ```
@@ -188,19 +246,22 @@ Dockerfile                   # multi-stage, standalone output (~90 MB)
   add moving parts for zero real gain here. List thumbnails lazy-load.
 - Prices are stored as cents and displayed in USD (matching the Beanconqueror
   export currency).
+
 ## AI enrichment (optional)
 
 When adding a coffee **from a store link**, an "Ask AI to fill details"
 button sends the product page to [OpenRouter](https://openrouter.ai) and
 prefills editable fields — country, region, process, roast level,
 blend/single-origin, decaf, tasting notes, and the product description as
-notes. This is an assisted draft; nothing is saved until you review.
+notes. This is an assisted draft; nothing is saved until you review. You can
+also re-read an existing coffee's product page and merge in AI-extracted
+details from the detail page.
 
-The key can be managed from the app itself: **Settings** (hamburger menu)
-saves it in the local settings table — server-side only, never sent to the
-browser and never included in exports. Alternatively set `OPENROUTER_API_KEY`
-in `.env.local` (see `.env.example`) as a fallback. Optional
-`OPENROUTER_MODEL` overrides the default `openai/gpt-4o-mini`.
+The key can be managed from the app itself: **Settings** saves it in the
+local settings table — server-side only, never sent to the browser and never
+included in exports. Alternatively set `OPENROUTER_API_KEY` in `.env.local`
+(see `.env.example`) as a fallback. Optional `OPENROUTER_MODEL` overrides the
+default `openai/gpt-4o-mini`.
 
 ## HTTP API
 
@@ -322,6 +383,12 @@ string clears a field on PATCH.
 |---|---|---|
 | `id` | `integer` | URI id (`/api/v1/coffees/:id`). |
 | `origin` | `string \| null` | Always derived from `country` + `region`; never accepted directly. |
+| `status` | `string` | Bag lifecycle: `resting`, `frozen`, `opened`, or `empty`. Managed via the app, not the API. |
+| `openedAt` | `string \| null` | `YYYY-MM-DD` the bag was first opened. |
+| `emptiedAt` | `string \| null` | `YYYY-MM-DD` the bag was emptied (terminal). |
+| `frozenAt` | `string \| null` | `YYYY-MM-DD` the current (or most recent) freeze began. |
+| `unfrozenAt` | `string \| null` | `YYYY-MM-DD` the most recent freeze ended. |
+| `frozenDays` | `integer` | Cumulative full days spent frozen. |
 | `aiEnriched` | `boolean` | Set when the AI assisted an entry. |
 | `sourceUuid` | `string \| null` | Beanconqueror import id (dedupe). |
 | `photoFile` | `string \| null` | Stored photo filename; manage photos via `photoUrl`. |
@@ -345,6 +412,12 @@ string clears a field on PATCH.
   "roastLevel": "medium",
   "roastDate": "2026-07-20",
   "purchaseDate": null,
+  "status": "resting",
+  "openedAt": null,
+  "emptiedAt": null,
+  "frozenAt": null,
+  "unfrozenAt": null,
+  "frozenDays": 0,
   "priceCents": 2600,
   "weightGrams": 340,
   "rating": 5,
