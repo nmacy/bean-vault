@@ -267,7 +267,7 @@ prefills editable fields — country, region, process, roast level,
 blend/single-origin, decaf, tasting notes, and the product description as
 notes. This is an assisted draft; nothing is saved until you review. You can
 also re-read an existing coffee's product page and merge in AI-extracted
-details from the detail page.
+details — that "Update from product link" tool lives on the edit page.
 
 The key can be managed from the app itself: **Settings** saves it in the
 local settings table — server-side only, never sent to the browser and never

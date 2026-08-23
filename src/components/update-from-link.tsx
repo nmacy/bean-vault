@@ -7,7 +7,13 @@ export default function UpdateFromLink({ id }: { id: number }) {
   const [state, formAction, isPending] = useActionState<LinkUpdateState, FormData>(updateCoffeeFromLink, {});
 
   return (
-    <div className="update-link">
+    <div className="form-card link-card">
+      <h2 className="link-heading">Update from product link</h2>
+      <p className="link-hint">
+        Re-read the product page and merge in AI-extracted details. Only fields the
+        page provides are filled in — nothing else changes.
+      </p>
+
       {state.message ? (
         <div className={state.ok ? "import-ok" : "form-error"}>{state.message}</div>
       ) : null}
@@ -20,8 +26,7 @@ export default function UpdateFromLink({ id }: { id: number }) {
       ) : null}
       <form action={formAction}>
         <input type="hidden" name="id" value={id} />
-        <span className="update-link-label">Update from product link</span>
-        <div className="link-lookup" style={{ marginBottom: 0 }}>
+        <div className="link-lookup">
           <input
             className="filter-search link-url"
             type="url"
