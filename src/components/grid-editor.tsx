@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { saveGrid, findCoffeePhoto, type GridRow } from "@/app/actions";
 import { formatCents } from "@/lib/format";
+import { ROAST_LEVELS, type SortKey, type SortSpec } from "@/lib/coffee-filters";
 
 type Cell = {
   roaster: string;
@@ -27,9 +28,6 @@ type Draft = Partial<Cell>;
 type BaseRow = GridRow & { photoFile: string | null };
 type Status = { kind: "saving" | "saved" | "finding" | "error"; msg?: string };
 
-const ROAST_LEVELS = ["light", "medium-light", "medium", "medium-dark", "dark"];
-const ROAST_ORDER = new Map(ROAST_LEVELS.map((l, i) => [l, i]));
-
 const TEXT_FIELDS: (keyof Cell)[] = ["roaster", "name", "country", "region", "variety", "producer", "elevation", "process"];
 
 const COLUMNS: { key: string; label: string }[] = [
@@ -52,55 +50,6 @@ const COLUMNS: { key: string; label: string }[] = [
 ];
 const COLUMN_KEYS = COLUMNS.map((c) => c.key);
 const COLUMNS_STORAGE_KEY = "bean-vault:grid-columns";
-const GRID_SORT_KEY = "bean-vault:grid-sort";
-const GRID_FILTERS_KEY = "bean-vault:grid-filters";
-
-function readStoredSort(): { key: string; dir: 1 | -1 } | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(GRID_SORT_KEY);
-    if (raw) {
-      const parsed: unknown = JSON.parse(raw);
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        typeof (parsed as { key?: unknown }).key === "string" &&
-        ((parsed as { dir?: unknown }).dir === 1 || (parsed as { dir?: unknown }).dir === -1) &&
-        COLUMN_KEYS.includes((parsed as { key: string }).key)
-      ) {
-        return { key: (parsed as { key: string }).key, dir: (parsed as { dir: 1 | -1 }).dir };
-      }
-    }
-  } catch {
-    /* corrupt storage — fall back to no sort */
-  }
-  return null;
-}
-
-function readStoredFilters() {
-  const empty = { search: "", roaster: "", roast: "", rating: "", year: "", decaf: "" };
-  if (typeof window === "undefined") return empty;
-  try {
-    const raw = window.localStorage.getItem(GRID_FILTERS_KEY);
-    if (raw) {
-      const parsed: unknown = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
-        const p = parsed as Record<string, unknown>;
-        return {
-          search: typeof p.search === "string" ? p.search : "",
-          roaster: typeof p.roaster === "string" ? p.roaster : "",
-          roast: typeof p.roast === "string" ? p.roast : "",
-          rating: typeof p.rating === "string" ? p.rating : "",
-          year: typeof p.year === "string" ? p.year : "",
-          decaf: typeof p.decaf === "string" ? p.decaf : "",
-        };
-      }
-    }
-  } catch {
-    /* corrupt storage — fall back to no filters */
-  }
-  return empty;
-}
 
 function readStoredColumns(): string[] {
   if (typeof window === "undefined") return COLUMN_KEYS;
@@ -200,14 +149,20 @@ function formatWeight(raw: string): string {
 
 /* ---------- component ---------- */
 
-export default function GridEditor({ beans }: { beans: BaseRow[] }) {
+export default function GridEditor({
+  beans,
+  sort,
+  onSortChange,
+}: {
+  beans: BaseRow[];
+  sort: SortSpec;
+  onSortChange: (s: SortSpec) => void;
+}) {
   const base = useMemo(() => beans.map((b) => ({ row: b, cell: toCell(b) })), [beans]);
   const [rows, setRows] = useState(base);
   const [drafts, setDrafts] = useState<Record<number, Draft>>({});
   const [statuses, setStatuses] = useState<Record<number, Status>>({});
   const [cellErrors, setCellErrors] = useState<Record<number, { roaster?: boolean; name?: boolean }>>({});
-  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(readStoredSort);
-  const [filters, setFilters] = useState(readStoredFilters);
   const [visibleCols, setVisibleCols] = useState<string[]>(readStoredColumns);
   const [editing, setEditing] = useState(false);
 
@@ -232,22 +187,6 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
       /* storage unavailable */
     }
   }, [visibleCols]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(GRID_SORT_KEY, JSON.stringify(sort));
-    } catch {
-      /* storage unavailable */
-    }
-  }, [sort]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(GRID_FILTERS_KEY, JSON.stringify(filters));
-    } catch {
-      /* storage unavailable */
-    }
-  }, [filters]);
 
   function setCell(id: number, field: keyof Cell, value: string) {
     draftsRef.current = { ...draftsRef.current, [id]: { ...draftsRef.current[id], [field]: value } };
@@ -428,91 +367,18 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
-  /* ---------- filter + sort ---------- */
+  /* ---------- ordering, filtering ---------- */
 
-  /** Bag year: roast date primarily (the vintage), purchase date as fallback. */
-  function yearOf(cell: Cell): string | null {
-    return cell.roastDate.slice(0, 4) || cell.purchaseDate.slice(0, 4) || null;
-  }
-
-  const roasters = useMemo(
-    () => [...new Set(rows.map((r) => r.row.roaster))].sort((a, b) => a.localeCompare(b)),
-    [rows],
-  );
-
-  const years = useMemo(
-    () =>
-      [...new Set(rows.map(({ cell }) => yearOf(cell)).filter((y): y is string => y !== null))].sort().reverse(),
-    [rows],
-  );
+  // `rows` already arrive filtered and sorted by the parent (CollectionView),
+  // which owns the shared filter/sort state for both the tiles and grid views.
+  const visible = rows;
 
   const batchCount = useMemo(() => rows.filter((r) => !r.row.photoFile).length, [rows]);
 
-  const visible = useMemo(() => {
-    const q = filters.search.trim().toLowerCase();
-    let list = rows.filter(({ row, cell }) => {
-      if (q && ![cell.roaster, cell.name, cell.country, cell.region, cell.variety, cell.producer, cell.process].some((f) => f.toLowerCase().includes(q))) {
-        return false;
-      }
-      if (filters.roaster && row.roaster !== filters.roaster) return false;
-      if (filters.roast) {
-        if (filters.roast === "__none__" ? cell.roastLevel !== "" : cell.roastLevel !== filters.roast) return false;
-      }
-      if (filters.rating) {
-        const v = row.rating;
-        if (filters.rating === "none" ? v != null : v !== Number(filters.rating)) return false;
-      }
-      if (filters.year) {
-        const y = yearOf(cell);
-        if (filters.year === "__none__" ? y !== null : y !== filters.year) return false;
-      }
-      if (filters.decaf === "yes" && !row.decaffeinated) return false;
-      if (filters.decaf === "no" && row.decaffeinated) return false;
-      return true;
-    });
-    if (sort) {
-      const { key, dir } = sort;
-      list = [...list].sort((a, b) => {
-        let va: unknown = a.cell[key as keyof Cell];
-        let vb: unknown = b.cell[key as keyof Cell];
-        if (key === "price") {
-          va = a.row.priceCents;
-          vb = b.row.priceCents;
-        } else if (key === "weight") {
-          va = a.row.weightGrams;
-          vb = b.row.weightGrams;
-        } else if (key === "rating") {
-          va = a.row.rating;
-          vb = b.row.rating;
-        } else if (key === "roastLevel") {
-          va = va ? ROAST_ORDER.get(va as string) : null;
-          vb = vb ? ROAST_ORDER.get(vb as string) : null;
-        } else if (key === "decaf") {
-          va = a.row.decaffeinated ? 1 : 0;
-          vb = b.row.decaffeinated ? 1 : 0;
-        }
-        const na = va == null || va === "";
-        const nb = vb == null || vb === "";
-        if (na && nb) return 0;
-        if (na) return 1;
-        if (nb) return -1;
-        if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
-        return String(va).localeCompare(String(vb)) * dir;
-      });
-    }
-    return list;
-  }, [rows, sort, filters]);
-
-  function cycleSort(key: string) {
-    setSort((s) => {
-      if (!s || s.key !== key) return { key, dir: 1 };
-      if (s.dir === 1) return { key, dir: -1 };
-      return null;
-    });
-  }
-
-  function resetFilters() {
-    setFilters({ search: "", roaster: "", roast: "", rating: "", year: "", decaf: "" });
+  function cycleSort(key: SortKey) {
+    if (!sort || sort.key !== key) return onSortChange({ key, dir: 1 });
+    if (sort.dir === 1) return onSortChange({ key, dir: -1 });
+    onSortChange(null);
   }
 
   function toggleColumn(key: string) {
@@ -655,40 +521,6 @@ function renderReadCell(row: BaseRow, key: string) {
   return (
     <>
       <div className="grid-toolbar">
-        <input
-          className="filter-search"
-          placeholder="Search roaster, name, country…"
-          value={filters.search}
-          onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-        />
-        <select className="filter-select" value={filters.roaster} onChange={(e) => setFilters((f) => ({ ...f, roaster: e.target.value }))}>
-          <option value="">All roasters</option>
-          {roasters.map((r) => <option key={r} value={r}>{r}</option>)}
-        </select>
-        <select className="filter-select" value={filters.roast} onChange={(e) => setFilters((f) => ({ ...f, roast: e.target.value }))}>
-          <option value="">Any roast</option>
-          {ROAST_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
-          <option value="__none__">No roast level</option>
-        </select>
-        <select className="filter-select" value={filters.year} onChange={(e) => setFilters((f) => ({ ...f, year: e.target.value }))}>
-          <option value="">Any year</option>
-          {years.map((y) => <option key={y} value={y}>{y}</option>)}
-          <option value="__none__">No year</option>
-        </select>
-        <select className="filter-select" value={filters.rating} onChange={(e) => setFilters((f) => ({ ...f, rating: e.target.value }))}>
-          <option value="">Any rating</option>
-          {[1, 2, 3, 4, 5].map((r) => <option key={r} value={r}>{r}★</option>)}
-          <option value="none">Unrated</option>
-        </select>
-        <select className="filter-select" value={filters.decaf} onChange={(e) => setFilters((f) => ({ ...f, decaf: e.target.value }))}>
-          <option value="">Any decaf</option>
-          <option value="yes">Decaf only</option>
-          <option value="no">Not decaf</option>
-        </select>
-        {(filters.search || filters.roaster || filters.roast || filters.rating || filters.year || filters.decaf) ? (
-          <button type="button" className="btn secondary btn-small" onClick={resetFilters}>Reset</button>
-        ) : null}
-        <span className="filter-count">{visible.length} of {rows.length}</span>
         {batchMsg ? <span className="grid-saved">{batchMsg}</span> : null}
         {editing ? (
           <span className="grid-hint">Edits save automatically when you leave a cell.</span>
@@ -746,7 +578,7 @@ function renderReadCell(row: BaseRow, key: string) {
                   <button
                     type="button"
                     className={`th-sort${sort?.key === c.key ? " active" : ""}`}
-                    onClick={() => cycleSort(c.key)}
+                    onClick={() => cycleSort(c.key as SortKey)}
                   >
                     {c.label}
                     {sort?.key === c.key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
