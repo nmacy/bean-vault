@@ -1,22 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import GridEditor from "@/components/grid-editor";
 import CoffeeFilterBar from "@/components/coffee-filter-bar";
 import { formatCents, photoUrl } from "@/lib/format";
 import { cap } from "@/lib/cap";
 import {
+  emptyFilters,
   filterCoffees,
   sortCoffees,
   yearOf,
-  readStoredFilters,
-  writeStoredFilters,
-  readStoredSort,
-  writeStoredSort,
-  type CoffeeFilters,
+  parseFilters,
+  parseSort,
+  FILTERS_KEY,
+  SORT_KEY,
   type SortSpec,
 } from "@/lib/coffee-filters";
+import { useLocalStorageState } from "@/lib/use-local-storage-state";
 
 const VIEW_KEY = "bean-vault:coffees-view";
 
@@ -49,32 +50,27 @@ export type BeanItem = {
 };
 
 const STATUS_KEY = "bean-vault:coffees-status";
-function readView(): "tiles" | "grid" {
-  if (typeof window === "undefined") return "tiles";
-  try {
-    const v = window.localStorage.getItem(VIEW_KEY);
-    if (v === "grid" || v === "tiles") return v;
-  } catch {
-    /* ignore */
-  }
-  return "tiles";
+const VALID_STATUSES = ["all", "resting", "frozen", "opened", "empty"];
+
+function parseView(raw: string): "tiles" | "grid" | null {
+  return raw === "tiles" || raw === "grid" ? raw : null;
 }
-function readStatus(): string {
-  if (typeof window === "undefined") return "all";
-  try {
-    const v = window.localStorage.getItem(STATUS_KEY);
-    if (["all", "resting", "frozen", "opened", "empty"].includes(v ?? "")) return v as string;
-  } catch {
-    /* ignore */
-  }
-  return "all";
+function parseStatus(raw: string): string | null {
+  return VALID_STATUSES.includes(raw) ? raw : null;
 }
 
 export default function CollectionView({ beans }: { beans: BeanItem[] }) {
-  const [view, setView] = useState<"tiles" | "grid">(readView);
-  const [status, setStatus] = useState<string>(readStatus);
-  const [filters, setFilters] = useState<CoffeeFilters>(readStoredFilters);
-  const [sort, setSort] = useState<SortSpec>(readStoredSort);
+  // Each of these is backed by localStorage via useLocalStorageState, which
+  // is hydration-safe: the server (and first client render) always sees the
+  // default, and the persisted value — if any — is picked up on the next
+  // render through useSyncExternalStore. Reading localStorage directly in a
+  // useState initializer (or restoring it via a mount effect) runs during
+  // hydration too and, the moment a stored value differs from the default,
+  // mismatches the server-rendered markup and trips a hydration error.
+  const [view, setView] = useLocalStorageState<"tiles" | "grid">(VIEW_KEY, "tiles", parseView, (v) => v);
+  const [status, setStatus] = useLocalStorageState<string>(STATUS_KEY, "all", parseStatus, (v) => v);
+  const [filters, setFilters] = useLocalStorageState(FILTERS_KEY, emptyFilters(), parseFilters);
+  const [sort, setSort] = useLocalStorageState<SortSpec>(SORT_KEY, null, parseSort);
 
   const byStatus = useMemo(() => {
     if (status === "all") return beans;
@@ -94,23 +90,6 @@ export default function CollectionView({ beans }: { beans: BeanItem[] }) {
     () => [...new Set(byStatus.map(yearOf).filter((y): y is string => y !== null))].sort().reverse(),
     [byStatus],
   );
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(VIEW_KEY, view);
-    } catch {
-      /* ignore */
-    }
-  }, [view]);
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(STATUS_KEY, status);
-    } catch {
-      /* ignore */
-    }
-  }, [status]);
-  useEffect(() => writeStoredFilters(filters), [filters]);
-  useEffect(() => writeStoredSort(sort), [sort]);
 
   return (
     <>
