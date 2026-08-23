@@ -10,6 +10,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Project rules
 
+- **Understand the codebase before doing any work.** Before writing code, read
+  README.md (the feature list, project layout, and HTTP API section) and the
+  files relevant to the change — at minimum `src/db/schema.ts` for data shape
+  and `src/lib/status.ts` for the bag lifecycle if the change touches either.
+  Don't guess at conventions, field names, or existing behavior; grep/read
+  first. This applies even to changes that look small or self-contained.
 - **README.md is the contract.** Whenever you change a feature, route, schema, API, component, or documented behavior, update README.md in the same commit. Stale docs are a bug.
 
 ## Working with GitHub
