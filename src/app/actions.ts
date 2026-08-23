@@ -10,7 +10,15 @@ import { dateField, dollarsToCents, elevationField, intField, photoFile as readP
 import { parseBeanconqueror } from "@/lib/beanconqueror";
 import { bestMatch, lookupProductPage, storeFor, storeProducts, type StoreProductDetail } from "@/lib/storefinder";
 import { parseCsv } from "@/lib/csv";
-import { DEFAULT_MODEL, enrichCoffeePage, fetchPageMeta, type AiCoffeeFields } from "@/lib/ai";
+import {
+  analyzeCoffeePhoto,
+  DEFAULT_MODEL,
+  enrichCoffeePage,
+  fetchPageMeta,
+  mergePhotoAndPageFields,
+  type AiCoffeeFields,
+  type PhotoFields,
+} from "@/lib/ai";
 import { addApiKey as storeApiKey, revokeApiKey as dropApiKey } from "@/lib/api-auth";
 import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
 import { canTransition, dayDiff, deriveStatus, toBeanStatus, todayStr, type BeanStatus } from "@/lib/status";
@@ -919,6 +927,48 @@ export async function resolveAiModel(): Promise<string> {
 /** Fetch the product page server-side and ask the AI to fill coffee facts. */
 export async function aiEnrichProduct(url: string): Promise<AiEnrichResult> {
   return enrichCoffeePage(url, await resolveAiKey(), await resolveAiModel());
+}
+
+/* ---------- AI photo scan ---------- */
+
+export type PhotoScanResult =
+  | { ok: true; fields: PhotoFields; productUrl: string | null }
+  | { ok: false; message: string };
+
+/**
+ * Read a coffee bag photo (as a data URL) with AI and extract label facts. If
+ * the guessed roaster has a known store feed and a product title match is
+ * found there, the matched product's page is also read and its (usually
+ * fuller) facts take priority over the photo's — see mergePhotoAndPageFields.
+ * Nothing is saved here: the caller reviews and picks which fields to apply.
+ */
+export async function scanCoffeePhoto(photoDataUrl: string): Promise<PhotoScanResult> {
+  const apiKey = await resolveAiKey();
+  if (!apiKey) return { ok: false, message: "OpenRouter API key is not configured." };
+  const model = await resolveAiModel();
+
+  const photo = await analyzeCoffeePhoto(photoDataUrl, apiKey, model);
+  if (!photo.ok) return photo;
+
+  let fields = photo.fields;
+  let productUrl: string | null = null;
+
+  if (fields.roaster && fields.name) {
+    const store = storeFor(fields.roaster);
+    if (store) {
+      const products = await storeProducts(store);
+      const match = bestMatch(fields.name, products);
+      if (match?.productUrl) {
+        const page = await enrichCoffeePage(match.productUrl, apiKey, model);
+        if (page.ok) {
+          productUrl = match.productUrl;
+          fields = mergePhotoAndPageFields(fields, page.fields);
+        }
+      }
+    }
+  }
+
+  return { ok: true, fields, productUrl };
 }
 
 export type SettingsState = { message?: string; ok?: boolean };
