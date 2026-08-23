@@ -6,9 +6,7 @@ import { coffees } from "@/db/schema";
 import { formatCents, photoUrl } from "@/lib/format";
 import { cap } from "@/lib/cap";
 import type { BeanStatus } from "@/lib/status";
-import DeleteButton from "@/components/delete-button";
 import FindPhotoButton from "@/components/find-photo-button";
-import UpdateFromLink from "@/components/update-from-link";
 import StatusToggle from "@/components/status-toggle";
 
 export const metadata = { title: "Coffee · Bean Vault" };
@@ -87,10 +85,7 @@ export default async function CoffeeDetailPage({ params }: { params: Promise<{ i
           <div className="actions">
             <Link href={`/coffees/${coffee.id}/edit`} className="btn">Edit</Link>
             {!coffee.photoFile ? <FindPhotoButton id={coffee.id} /> : null}
-            <DeleteButton id={coffee.id} />
           </div>
-
-          <UpdateFromLink id={coffee.id} />
         </div>
       </div>
     </main>
