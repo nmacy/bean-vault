@@ -31,6 +31,7 @@ export type BeanItem = {
   photoFile: string | null;
 };
 
+const STATUS_KEY = "bean-vault:coffees-status";
 function readView(): "tiles" | "grid" {
   if (typeof window === "undefined") return "tiles";
   try {
@@ -41,10 +42,20 @@ function readView(): "tiles" | "grid" {
   }
   return "tiles";
 }
+function readStatus(): string {
+  if (typeof window === "undefined") return "all";
+  try {
+    const v = window.localStorage.getItem(STATUS_KEY);
+    if (["all", "resting", "frozen", "opened", "empty"].includes(v ?? "")) return v as string;
+  } catch {
+    /* ignore */
+  }
+  return "all";
+}
 
 export default function CollectionView({ beans }: { beans: BeanItem[] }) {
   const [view, setView] = useState<"tiles" | "grid">(readView);
-  const [status, setStatus] = useState<string>("all");
+  const [status, setStatus] = useState<string>(readStatus);
   const filtered = useMemo(() => {
     if (status === "all") return beans;
     return beans.filter((b) => b.status === status);
@@ -57,6 +68,13 @@ export default function CollectionView({ beans }: { beans: BeanItem[] }) {
       /* ignore */
     }
   }, [view]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STATUS_KEY, status);
+    } catch {
+      /* ignore */
+    }
+  }, [status]);
 
   return (
     <>

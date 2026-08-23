@@ -52,6 +52,55 @@ const COLUMNS: { key: string; label: string }[] = [
 ];
 const COLUMN_KEYS = COLUMNS.map((c) => c.key);
 const COLUMNS_STORAGE_KEY = "bean-vault:grid-columns";
+const GRID_SORT_KEY = "bean-vault:grid-sort";
+const GRID_FILTERS_KEY = "bean-vault:grid-filters";
+
+function readStoredSort(): { key: string; dir: 1 | -1 } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(GRID_SORT_KEY);
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        typeof (parsed as { key?: unknown }).key === "string" &&
+        ((parsed as { dir?: unknown }).dir === 1 || (parsed as { dir?: unknown }).dir === -1) &&
+        COLUMN_KEYS.includes((parsed as { key: string }).key)
+      ) {
+        return { key: (parsed as { key: string }).key, dir: (parsed as { dir: 1 | -1 }).dir };
+      }
+    }
+  } catch {
+    /* corrupt storage — fall back to no sort */
+  }
+  return null;
+}
+
+function readStoredFilters() {
+  const empty = { search: "", roaster: "", roast: "", rating: "", year: "", decaf: "" };
+  if (typeof window === "undefined") return empty;
+  try {
+    const raw = window.localStorage.getItem(GRID_FILTERS_KEY);
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        const p = parsed as Record<string, unknown>;
+        return {
+          search: typeof p.search === "string" ? p.search : "",
+          roaster: typeof p.roaster === "string" ? p.roaster : "",
+          roast: typeof p.roast === "string" ? p.roast : "",
+          rating: typeof p.rating === "string" ? p.rating : "",
+          year: typeof p.year === "string" ? p.year : "",
+          decaf: typeof p.decaf === "string" ? p.decaf : "",
+        };
+      }
+    }
+  } catch {
+    /* corrupt storage — fall back to no filters */
+  }
+  return empty;
+}
 
 function readStoredColumns(): string[] {
   if (typeof window === "undefined") return COLUMN_KEYS;
@@ -157,8 +206,8 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
   const [drafts, setDrafts] = useState<Record<number, Draft>>({});
   const [statuses, setStatuses] = useState<Record<number, Status>>({});
   const [cellErrors, setCellErrors] = useState<Record<number, { roaster?: boolean; name?: boolean }>>({});
-  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
-  const [filters, setFilters] = useState({ search: "", roaster: "", roast: "", rating: "", year: "", decaf: "" });
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(readStoredSort);
+  const [filters, setFilters] = useState(readStoredFilters);
   const [visibleCols, setVisibleCols] = useState<string[]>(readStoredColumns);
   const [editing, setEditing] = useState(false);
 
@@ -183,6 +232,22 @@ export default function GridEditor({ beans }: { beans: BaseRow[] }) {
       /* storage unavailable */
     }
   }, [visibleCols]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(GRID_SORT_KEY, JSON.stringify(sort));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [sort]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(GRID_FILTERS_KEY, JSON.stringify(filters));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [filters]);
 
   function setCell(id: number, field: keyof Cell, value: string) {
     draftsRef.current = { ...draftsRef.current, [id]: { ...draftsRef.current[id], [field]: value } };
