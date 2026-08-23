@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import GridEditor from "@/components/grid-editor";
 import { formatCents, photoUrl } from "@/lib/format";
@@ -22,6 +22,7 @@ export type BeanItem = {
   roastLevel: string | null;
   roastDate: string | null;
   purchaseDate: string | null;
+  status: string;
   priceCents: number | null;
   weightGrams: number | null;
   rating: number | null;
@@ -43,6 +44,11 @@ function readView(): "tiles" | "grid" {
 
 export default function CollectionView({ beans }: { beans: BeanItem[] }) {
   const [view, setView] = useState<"tiles" | "grid">(readView);
+  const [status, setStatus] = useState<string>("all");
+  const filtered = useMemo(() => {
+    if (status === "all") return beans;
+    return beans.filter((b) => b.status === status);
+  }, [beans, status]);
 
   useEffect(() => {
     try {
@@ -55,7 +61,7 @@ export default function CollectionView({ beans }: { beans: BeanItem[] }) {
   return (
     <>
       <div className="coffee-head">
-        <h1>My coffees ({beans.length})</h1>
+        <h1>My coffees ({filtered.length})</h1>
         <div className="coffee-head-actions">
           <div className="view-switch" role="group" aria-label="Collection view">
             <button
@@ -90,7 +96,21 @@ export default function CollectionView({ beans }: { beans: BeanItem[] }) {
         </div>
       </div>
 
-      {view === "tiles" ? <Tiles beans={beans} /> : <GridEditor beans={beans} />}
+      <div className="status-filter" role="group" aria-label="Filter by status">
+        {(["all", "resting", "frozen", "opened", "empty"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            className={`chip${status === s ? " active" : ""}`}
+            onClick={() => setStatus(s)}
+          >
+            {s === "all" ? "All" : s[0].toUpperCase() + s.slice(1)} (
+            {s === "all" ? beans.length : beans.filter((b) => b.status === s).length})
+          </button>
+        ))}
+      </div>
+
+      {view === "tiles" ? <Tiles beans={filtered} /> : <GridEditor beans={filtered} />}
     </>
   );
 }

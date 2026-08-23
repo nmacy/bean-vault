@@ -124,6 +124,30 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
             <label htmlFor="purchaseDate">Purchase date</label>
             <input id="purchaseDate" name="purchaseDate" type="date" defaultValue={coffee?.purchaseDate ?? ""} />
           </div>
+          {coffee ? (
+            <>
+              <div className="field">
+                <label htmlFor="openedAt">Opened date</label>
+                <input id="openedAt" name="openedAt" type="date" defaultValue={coffee.openedAt ?? ""} />
+              </div>
+              <div className="field">
+                <label htmlFor="frozenAt">Frozen date</label>
+                <input id="frozenAt" name="frozenAt" type="date" defaultValue={coffee.frozenAt ?? ""} />
+              </div>
+              <div className="field">
+                <label htmlFor="unfrozenAt">Unfrozen date</label>
+                <input id="unfrozenAt" name="unfrozenAt" type="date" defaultValue={coffee.unfrozenAt ?? ""} />
+              </div>
+              <div className="field">
+                <label htmlFor="emptiedAt">Emptied date</label>
+                <input id="emptiedAt" name="emptiedAt" type="date" defaultValue={coffee.emptiedAt ?? ""} />
+              </div>
+              <div className="field">
+                <label htmlFor="frozenDays">Frozen days <span className="hint">(total)</span></label>
+                <input id="frozenDays" name="frozenDays" type="number" min="0" inputMode="numeric" defaultValue={coffee.frozenDays ?? 0} />
+              </div>
+            </>
+          ) : null}
           <div className="field">
             <label htmlFor="price">Price <span className="hint">(USD)</span></label>
             <input id="price" name="price" type="text" inputMode="decimal" defaultValue={priceValue} placeholder="18.00" maxLength={10} onKeyDown={numericKeydown(true)} onPaste={(e) => numericPaste(e, true)} />

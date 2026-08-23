@@ -22,6 +22,7 @@ export default async function CoffeesPage() {
       roastLevel: coffees.roastLevel,
       roastDate: coffees.roastDate,
       purchaseDate: coffees.purchaseDate,
+      status: coffees.status,
       priceCents: coffees.priceCents,
       weightGrams: coffees.weightGrams,
       rating: coffees.rating,
