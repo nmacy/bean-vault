@@ -32,6 +32,12 @@ run on your own machine or a homelab server; all data stays on your disk.
   - roaster/name cannot be emptied;
   - unsaved edits trigger a leave-page warning;
   - show/hide columns (persisted separately, grid-only).
+  - Lifecycle fields are editable too — opened/frozen/unfrozen/emptied dates
+    and cumulative frozen days, same raw fields the edit form exposes. Status
+    is a read-only column derived from those dates (as on the edit form),
+    not independently settable — edit the surrounding dates to move a bag
+    through its lifecycle from the grid; one-click Freeze/Open/Empty buttons
+    remain on the detail page.
 - **Bag lifecycle** — each bag is `resting` by default and moves through a
   small state machine: `resting ⇄ frozen`, `resting → opened`, `frozen →
   empty`, `opened → frozen`, and `opened → empty`; emptying is undoable back

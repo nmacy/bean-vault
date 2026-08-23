@@ -5,6 +5,7 @@ import Link from "next/link";
 import { saveGrid, findCoffeePhoto, type GridRow } from "@/app/actions";
 import { formatCents } from "@/lib/format";
 import { ROAST_LEVELS, type SortKey, type SortSpec } from "@/lib/coffee-filters";
+import { deriveStatus, STATUS_LABEL, toBeanStatus } from "@/lib/status";
 
 type Cell = {
   roaster: string;
@@ -19,13 +20,18 @@ type Cell = {
   roastLevel: string;
   roastDate: string;
   purchaseDate: string;
+  openedAt: string;
+  frozenAt: string;
+  unfrozenAt: string;
+  emptiedAt: string;
+  frozenDays: string;
   price: string;
   weight: string;
   rating: string;
 };
 
 type Draft = Partial<Cell>;
-type BaseRow = GridRow & { photoFile: string | null };
+type BaseRow = GridRow & { photoFile: string | null; status: string };
 type Status = { kind: "saving" | "saved" | "finding" | "error"; msg?: string };
 
 const TEXT_FIELDS: (keyof Cell)[] = ["roaster", "name", "country", "region", "variety", "producer", "elevation", "process"];
@@ -43,6 +49,12 @@ const COLUMNS: { key: string; label: string }[] = [
   { key: "roastLevel", label: "Roast" },
   { key: "roastDate", label: "Roast date" },
   { key: "purchaseDate", label: "Purchased" },
+  { key: "status", label: "Status" },
+  { key: "openedAt", label: "Opened" },
+  { key: "frozenAt", label: "Frozen" },
+  { key: "unfrozenAt", label: "Unfrozen" },
+  { key: "emptiedAt", label: "Emptied" },
+  { key: "frozenDays", label: "Frozen days" },
   { key: "price", label: "Price" },
   { key: "weight", label: "Weight (g)" },
   { key: "rating", label: "Rating" },
@@ -82,6 +94,11 @@ function toCell(row: GridRow): Cell {
     roastLevel: row.roastLevel ?? "",
     roastDate: row.roastDate ?? "",
     purchaseDate: row.purchaseDate ?? "",
+    openedAt: row.openedAt ?? "",
+    frozenAt: row.frozenAt ?? "",
+    unfrozenAt: row.unfrozenAt ?? "",
+    emptiedAt: row.emptiedAt ?? "",
+    frozenDays: String(row.frozenDays ?? 0),
     price: row.priceCents != null ? (row.priceCents / 100).toFixed(2) : "",
     weight: row.weightGrams != null ? String(row.weightGrams) : "",
     rating: row.rating != null ? String(row.rating) : "",
@@ -91,6 +108,7 @@ function toCell(row: GridRow): Cell {
 function toPayload(row: BaseRow, cell: Cell): GridRow {
   const price = cell.price.trim() === "" ? null : Math.round(Number(cell.price) * 100);
   const weight = cell.weight.trim() === "" ? null : Math.round(Number(cell.weight));
+  const frozenDays = cell.frozenDays.trim() === "" ? 0 : Math.round(Number(cell.frozenDays));
   return {
     id: row.id,
     roaster: cell.roaster.trim(),
@@ -105,6 +123,11 @@ function toPayload(row: BaseRow, cell: Cell): GridRow {
     roastLevel: cell.roastLevel || null,
     roastDate: cell.roastDate || null,
     purchaseDate: cell.purchaseDate || null,
+    openedAt: cell.openedAt || null,
+    frozenAt: cell.frozenAt || null,
+    unfrozenAt: cell.unfrozenAt || null,
+    emptiedAt: cell.emptiedAt || null,
+    frozenDays: Number.isFinite(frozenDays) && frozenDays > 0 ? frozenDays : 0,
     priceCents: price !== null && Number.isFinite(price) ? price : null,
     weightGrams: weight !== null && Number.isFinite(weight) && weight > 0 ? weight : null,
     rating: cell.rating ? Number(cell.rating) : null,
@@ -144,6 +167,18 @@ function formatWeight(raw: string): string {
   if (!t) return "";
   const n = Math.round(Number(t));
   if (!Number.isFinite(n) || n < 1 || n > 1_000_000) return t;
+  return String(n);
+}
+
+function sanitizeCount(raw: string): string {
+  return raw.replace(/\D/g, "").slice(0, 7);
+}
+
+function formatCount(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "0";
+  const n = Math.round(Number(t));
+  if (!Number.isFinite(n) || n < 0 || n > 1_000_000) return t;
   return String(n);
 }
 
@@ -253,7 +288,10 @@ export default function GridEditor({
       const res = await saveGrid([payload]);
       savingRef.current.delete(id);
       if (res.saved === 1) {
-        rowsRef.current = rowsRef.current.map((en) => (en.row.id === id ? { ...en, cell: merged } : en));
+        const status = deriveStatus(payload);
+        rowsRef.current = rowsRef.current.map((en) =>
+          en.row.id === id ? { ...en, cell: merged, row: { ...en.row, status } } : en,
+        );
         setRows(rowsRef.current);
         const next = { ...draftsRef.current };
         delete next[id];
@@ -282,6 +320,7 @@ export default function GridEditor({
     let fixed = raw;
     if (field === "price") fixed = formatPrice(sanitizePrice(raw));
     else if (field === "weight") fixed = formatWeight(sanitizeWeight(raw));
+    else if (field === "frozenDays") fixed = formatCount(sanitizeCount(raw));
     else if (TEXT_FIELDS.includes(field)) fixed = raw.trim();
 
     if (fixed !== raw) setCell(id, field, fixed);
@@ -397,6 +436,20 @@ export default function GridEditor({
 
   /* ---------- cell rendering ---------- */
 
+  // Status is derived from the lifecycle dates (like the edit form), not
+  // independently settable, so it renders the same read-only badge whether
+  // or not the row is being edited — edit the dates around it instead.
+  function statusCell(row: BaseRow) {
+    const s = toBeanStatus(row.status);
+    return (
+      <td>
+        <span className="cell-text">
+          <span className="status-dot" data-status={s} aria-hidden="true" /> {STATUS_LABEL[s]}
+        </span>
+      </td>
+    );
+  }
+
   function renderCell(row: BaseRow, key: string) {
     switch (key) {
       case "roaster":
@@ -456,6 +509,22 @@ export default function GridEditor({
         return <td><input type="date" value={cellValue(row.id, "roastDate")} onChange={(e) => setCell(row.id, "roastDate", e.target.value)} onBlur={() => handleBlur(row.id, "roastDate")} /></td>;
       case "purchaseDate":
         return <td><input type="date" value={cellValue(row.id, "purchaseDate")} onChange={(e) => setCell(row.id, "purchaseDate", e.target.value)} onBlur={() => handleBlur(row.id, "purchaseDate")} /></td>;
+      case "status":
+        return statusCell(row);
+      case "openedAt":
+        return <td><input type="date" value={cellValue(row.id, "openedAt")} onChange={(e) => setCell(row.id, "openedAt", e.target.value)} onBlur={() => handleBlur(row.id, "openedAt")} /></td>;
+      case "frozenAt":
+        return <td><input type="date" value={cellValue(row.id, "frozenAt")} onChange={(e) => setCell(row.id, "frozenAt", e.target.value)} onBlur={() => handleBlur(row.id, "frozenAt")} /></td>;
+      case "unfrozenAt":
+        return <td><input type="date" value={cellValue(row.id, "unfrozenAt")} onChange={(e) => setCell(row.id, "unfrozenAt", e.target.value)} onBlur={() => handleBlur(row.id, "unfrozenAt")} /></td>;
+      case "emptiedAt":
+        return <td><input type="date" value={cellValue(row.id, "emptiedAt")} onChange={(e) => setCell(row.id, "emptiedAt", e.target.value)} onBlur={() => handleBlur(row.id, "emptiedAt")} /></td>;
+      case "frozenDays":
+        return (
+          <td className="num">
+            <input inputMode="numeric" value={cellValue(row.id, "frozenDays")} placeholder="0" onChange={(e) => setCell(row.id, "frozenDays", sanitizeCount(e.target.value))} onBlur={() => handleBlur(row.id, "frozenDays")} />
+          </td>
+        );
       case "price":
         return (
           <td className="num">
@@ -510,6 +579,12 @@ function renderReadCell(row: BaseRow, key: string) {
       case "roastLevel": return text(row.roastLevel ?? "");
       case "roastDate": return text(row.roastDate ?? "");
       case "purchaseDate": return text(row.purchaseDate ?? "");
+      case "status": return statusCell(row);
+      case "openedAt": return text(row.openedAt ?? "");
+      case "frozenAt": return text(row.frozenAt ?? "");
+      case "unfrozenAt": return text(row.unfrozenAt ?? "");
+      case "emptiedAt": return text(row.emptiedAt ?? "");
+      case "frozenDays": return <td className="num">{row.frozenDays > 0 ? `${row.frozenDays} d` : <span className="cell-none">—</span>}</td>;
       case "price": return <td className="num">{row.priceCents != null ? formatCents(row.priceCents) : <span className="cell-none">—</span>}</td>;
       case "weight": return <td className="num">{row.weightGrams != null ? `${row.weightGrams} g` : <span className="cell-none">—</span>}</td>;
       case "rating": return <td>{row.rating != null ? <span className="stars">{"★".repeat(row.rating)}</span> : <span className="cell-none">—</span>}</td>;
@@ -585,7 +660,7 @@ function renderReadCell(row: BaseRow, key: string) {
                   </button>
                 </th>
               ))}
-              <th className="col-status">Status</th>
+              <th className="col-status">Save</th>
             </tr>
           </thead>
           <tbody>
