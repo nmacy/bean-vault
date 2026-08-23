@@ -161,70 +161,40 @@ export function sortCoffees<T extends FilterableCoffee>(list: T[], sort: SortSpe
   return [...list].sort((a, b) => compareCoffees(a, b, sort));
 }
 
-/* ---------- persisted state (localStorage) ---------- */
+/* ---------- persisted state (localStorage keys + pure parsers) ----------
+ * Reading/writing itself goes through useLocalStorageState (a React hook,
+ * see src/lib/use-local-storage-state.ts) so it stays hydration-safe —
+ * these are just the pure "is this raw string a valid CoffeeFilters/SortSpec"
+ * parsers it needs, kept here next to the types they parse.
+ */
 
-const FILTERS_KEY = "bean-vault:coffee-filters";
-const SORT_KEY = "bean-vault:coffee-sort";
+export const FILTERS_KEY = "bean-vault:coffee-filters";
+export const SORT_KEY = "bean-vault:coffee-sort";
 
-export function readStoredFilters(): CoffeeFilters {
-  const fallback = emptyFilters();
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = window.localStorage.getItem(FILTERS_KEY);
-    if (raw) {
-      const parsed: unknown = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
-        const p = parsed as Record<string, unknown>;
-        return {
-          search: typeof p.search === "string" ? p.search : "",
-          roaster: typeof p.roaster === "string" ? p.roaster : "",
-          roast: typeof p.roast === "string" ? p.roast : "",
-          rating: typeof p.rating === "string" ? p.rating : "",
-          year: typeof p.year === "string" ? p.year : "",
-          decaf: typeof p.decaf === "string" ? p.decaf : "",
-        };
-      }
-    }
-  } catch {
-    /* corrupt storage — fall back to no filters */
-  }
-  return fallback;
+export function parseFilters(raw: string): CoffeeFilters | null {
+  const parsed: unknown = JSON.parse(raw);
+  if (!parsed || typeof parsed !== "object") return null;
+  const p = parsed as Record<string, unknown>;
+  return {
+    search: typeof p.search === "string" ? p.search : "",
+    roaster: typeof p.roaster === "string" ? p.roaster : "",
+    roast: typeof p.roast === "string" ? p.roast : "",
+    rating: typeof p.rating === "string" ? p.rating : "",
+    year: typeof p.year === "string" ? p.year : "",
+    decaf: typeof p.decaf === "string" ? p.decaf : "",
+  };
 }
 
-export function writeStoredFilters(f: CoffeeFilters) {
-  try {
-    window.localStorage.setItem(FILTERS_KEY, JSON.stringify(f));
-  } catch {
-    /* storage unavailable */
-  }
-}
-
-export function readStoredSort(): SortSpec {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(SORT_KEY);
-    if (raw) {
-      const parsed: unknown = JSON.parse(raw);
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        typeof (parsed as { key?: unknown }).key === "string" &&
-        ((parsed as { dir?: unknown }).dir === 1 || (parsed as { dir?: unknown }).dir === -1) &&
-        (SORT_KEYS as readonly string[]).includes((parsed as { key: string }).key)
-      ) {
-        return { key: (parsed as { key: SortKey }).key, dir: (parsed as { dir: 1 | -1 }).dir };
-      }
-    }
-  } catch {
-    /* corrupt storage — fall back to no sort */
+export function parseSort(raw: string): SortSpec | null {
+  const parsed: unknown = JSON.parse(raw);
+  if (
+    parsed &&
+    typeof parsed === "object" &&
+    typeof (parsed as { key?: unknown }).key === "string" &&
+    ((parsed as { dir?: unknown }).dir === 1 || (parsed as { dir?: unknown }).dir === -1) &&
+    (SORT_KEYS as readonly string[]).includes((parsed as { key: string }).key)
+  ) {
+    return { key: (parsed as { key: SortKey }).key, dir: (parsed as { dir: 1 | -1 }).dir };
   }
   return null;
-}
-
-export function writeStoredSort(s: SortSpec) {
-  try {
-    window.localStorage.setItem(SORT_KEY, JSON.stringify(s));
-  } catch {
-    /* storage unavailable */
-  }
 }
