@@ -19,6 +19,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   changes.
 - Branch off `main` with a short, descriptive name prefixed by type, e.g.
   `feat/bag-tagging`, `fix/grid-sort-persist`, `docs/update-readme`.
+- **Start a new feature branch for each unrelated feature or change.** Don't
+  keep adding unrelated work to a branch/PR that's already open for something
+  else — even if it's a convenient moment. If what you're about to do isn't
+  the same logical change as the branch you're on, branch off `main` again
+  instead of piling onto it.
 - Open a PR against `main` for every change; don't push straight to `main`
   even if you have permission to.
 - Don't merge your own PR unless the user explicitly asks you to. Default to
