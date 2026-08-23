@@ -16,6 +16,14 @@ run on your own machine or a homelab server; all data stays on your disk.
   bags behind it.
 - **Bag collection** (`/coffees`) — a tiles view of every bag with its photo,
   tags, price, weight and rating. Click through to the detail page.
+- **Filtering and sorting** (`/coffees`, tiles and grid alike) — a shared
+  toolbar above both views: search text, roaster, roast level, rating, year
+  (roast year, purchase year as fallback) and decaf filters, plus a sort-by
+  field with a direction toggle. Switching between tiles and grid keeps the
+  same filters and sort applied — it's shared state, not per-view. The grid's
+  column headers are an alternate way to set the same sort. A separate
+  status filter (resting/frozen/opened/empty) sits above it. All of it
+  persists between visits.
 - **Spreadsheet grid editing** (`/coffees`, grid view) — toggle between tiles
   and a table to edit any number of coffees. Cells **auto-save when you leave
   them**, with live forced formatting and validation:
@@ -23,9 +31,7 @@ run on your own machine or a homelab server; all data stays on your disk.
   - weight accepts digits only;
   - roaster/name cannot be emptied;
   - unsaved edits trigger a leave-page warning;
-  - sort by clicking column headers; show/hide columns; filter by search text,
-    roaster, roast level, rating, year (roast year, purchase year as fallback)
-    and decaf. Columns, sort and filters persist between visits.
+  - show/hide columns (persisted separately, grid-only).
 - **Bag lifecycle** — each bag is `resting` by default and moves through a
   small state machine: `resting ⇄ frozen`, `resting → opened`, `frozen →
   empty`, `opened → frozen`, and `opened → empty`; emptying is undoable back

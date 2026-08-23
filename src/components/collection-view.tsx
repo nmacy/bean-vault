@@ -3,8 +3,20 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import GridEditor from "@/components/grid-editor";
+import CoffeeFilterBar from "@/components/coffee-filter-bar";
 import { formatCents, photoUrl } from "@/lib/format";
 import { cap } from "@/lib/cap";
+import {
+  filterCoffees,
+  sortCoffees,
+  yearOf,
+  readStoredFilters,
+  writeStoredFilters,
+  readStoredSort,
+  writeStoredSort,
+  type CoffeeFilters,
+  type SortSpec,
+} from "@/lib/coffee-filters";
 
 const VIEW_KEY = "bean-vault:coffees-view";
 
@@ -56,10 +68,27 @@ function readStatus(): string {
 export default function CollectionView({ beans }: { beans: BeanItem[] }) {
   const [view, setView] = useState<"tiles" | "grid">(readView);
   const [status, setStatus] = useState<string>(readStatus);
-  const filtered = useMemo(() => {
+  const [filters, setFilters] = useState<CoffeeFilters>(readStoredFilters);
+  const [sort, setSort] = useState<SortSpec>(readStoredSort);
+
+  const byStatus = useMemo(() => {
     if (status === "all") return beans;
     return beans.filter((b) => b.status === status);
   }, [beans, status]);
+
+  const filtered = useMemo(
+    () => sortCoffees(filterCoffees(byStatus, filters), sort),
+    [byStatus, filters, sort],
+  );
+
+  const roasters = useMemo(
+    () => [...new Set(byStatus.map((b) => b.roaster))].sort((a, b) => a.localeCompare(b)),
+    [byStatus],
+  );
+  const years = useMemo(
+    () => [...new Set(byStatus.map(yearOf).filter((y): y is string => y !== null))].sort().reverse(),
+    [byStatus],
+  );
 
   useEffect(() => {
     try {
@@ -75,6 +104,8 @@ export default function CollectionView({ beans }: { beans: BeanItem[] }) {
       /* ignore */
     }
   }, [status]);
+  useEffect(() => writeStoredFilters(filters), [filters]);
+  useEffect(() => writeStoredSort(sort), [sort]);
 
   return (
     <>
@@ -128,7 +159,18 @@ export default function CollectionView({ beans }: { beans: BeanItem[] }) {
         ))}
       </div>
 
-      {view === "tiles" ? <Tiles beans={filtered} /> : <GridEditor beans={filtered} />}
+      <CoffeeFilterBar
+        filters={filters}
+        onFiltersChange={setFilters}
+        sort={sort}
+        onSortChange={setSort}
+        roasters={roasters}
+        years={years}
+        resultCount={filtered.length}
+        totalCount={byStatus.length}
+      />
+
+      {view === "tiles" ? <Tiles beans={filtered} /> : <GridEditor beans={filtered} sort={sort} onSortChange={setSort} />}
     </>
   );
 }
