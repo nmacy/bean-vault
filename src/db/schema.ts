@@ -15,6 +15,13 @@ export const coffees = sqliteTable("coffees", {
   roastLevel: text("roast_level"),
   roastDate: text("roast_date"), // ISO YYYY-MM-DD
   purchaseDate: text("purchase_date"), // ISO YYYY-MM-DD
+  /* ---- lifecycle: resting → frozen ⇄ resting, → opened → empty ---- */
+  status: text("status").notNull().default("resting"), // resting | frozen | opened | empty
+  openedAt: text("opened_at"), // ISO YYYY-MM-DD, when the bag was first opened
+  emptiedAt: text("emptied_at"), // ISO YYYY-MM-DD, terminal — set once the bag is empty
+  frozenAt: text("frozen_at"), // ISO YYYY-MM-DD, start of the current (or most recent) freeze
+  unfrozenAt: text("unfrozen_at"), // ISO YYYY-MM-DD, when the most recent freeze ended
+  frozenDays: integer("frozen_days").notNull().default(0), // cumulative full days spent frozen
   priceCents: integer("price_cents"),
   weightGrams: integer("weight_grams"),
   rating: integer("rating"), // 1..5

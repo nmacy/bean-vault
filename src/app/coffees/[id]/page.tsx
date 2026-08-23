@@ -5,9 +5,11 @@ import { db } from "@/db";
 import { coffees } from "@/db/schema";
 import { formatCents, photoUrl } from "@/lib/format";
 import { cap } from "@/lib/cap";
+import type { BeanStatus } from "@/lib/status";
 import DeleteButton from "@/components/delete-button";
 import FindPhotoButton from "@/components/find-photo-button";
 import UpdateFromLink from "@/components/update-from-link";
+import StatusToggle from "@/components/status-toggle";
 
 export const metadata = { title: "Coffee · Bean Vault" };
 export const dynamic = "force-dynamic";
@@ -42,6 +44,15 @@ export default async function CoffeeDetailPage({ params }: { params: Promise<{ i
               <span style={{ color: "#d8c9b8" }}>{"★".repeat(5 - coffee.rating)}</span>
             </div>
           ) : null}
+          <StatusToggle
+            id={coffee.id}
+            status={coffee.status as BeanStatus}
+            roastDate={coffee.roastDate}
+            openedAt={coffee.openedAt}
+            emptiedAt={coffee.emptiedAt}
+            frozenAt={coffee.frozenAt}
+            frozenDays={coffee.frozenDays}
+          />
 
           <dl className="fields">
             {coffee.country ? <><dt>Country</dt><dd>{coffee.country}</dd></> : null}

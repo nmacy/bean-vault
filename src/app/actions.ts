@@ -13,6 +13,7 @@ import { parseCsv } from "@/lib/csv";
 import { DEFAULT_MODEL, enrichCoffeePage, fetchPageMeta, type AiCoffeeFields } from "@/lib/ai";
 import { addApiKey as storeApiKey, revokeApiKey as dropApiKey } from "@/lib/api-auth";
 import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
+import { canTransition, dayDiff, deriveStatus, toBeanStatus, todayStr, type BeanStatus } from "@/lib/status";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
@@ -180,6 +181,11 @@ function collect(form: FormData) {
     roastLevel: text(form, "roastLevel"),
     roastDate: dateField(form, "roastDate"),
     purchaseDate: dateField(form, "purchaseDate"),
+    openedAt: dateField(form, "openedAt"),
+    emptiedAt: dateField(form, "emptiedAt"),
+    frozenAt: dateField(form, "frozenAt"),
+    unfrozenAt: dateField(form, "unfrozenAt"),
+    frozenDays: intField(form, "frozenDays", 0, 1_000_000) ?? 0,
     priceCents,
     weightGrams,
     rating: intField(form, "rating", 1, 5),
@@ -219,6 +225,12 @@ export async function createCoffee(_prev: FormState, formData: FormData): Promis
       roastLevel: input.roastLevel,
       roastDate: input.roastDate,
       purchaseDate: input.purchaseDate,
+      openedAt: input.openedAt,
+      emptiedAt: input.emptiedAt,
+      frozenAt: input.frozenAt,
+      unfrozenAt: input.unfrozenAt,
+      frozenDays: input.frozenDays,
+      status: deriveStatus(input),
       priceCents: input.priceCents,
       weightGrams: input.weightGrams,
       rating: input.rating,
@@ -247,6 +259,12 @@ function fields(input: Collected) {
     roastLevel: input.roastLevel,
     roastDate: input.roastDate,
     purchaseDate: input.purchaseDate,
+    openedAt: input.openedAt,
+    emptiedAt: input.emptiedAt,
+    frozenAt: input.frozenAt,
+    unfrozenAt: input.unfrozenAt,
+    frozenDays: input.frozenDays,
+    status: deriveStatus(input),
     priceCents: input.priceCents,
     weightGrams: input.weightGrams,
     rating: input.rating,
@@ -301,6 +319,60 @@ export async function deleteCoffee(id: number): Promise<void> {
   await deletePhoto(existing.photoFile);
   revalidatePath("/"); revalidatePath("/coffees");
   redirect("/coffees");
+}
+
+/* ---------- lifecycle status (resting / frozen / opened / empty) ---------- */
+
+/**
+ * Transition a bag to `target`. The state machine (see src/lib/status.ts)
+ * guards legal transitions; illegal ones are no-ops. Date bookkeeping:
+ *
+ * - frozen time is folded into `frozenDays` the moment you leave the frozen
+ *   state, and `restingDays` adds the current freeze while still frozen
+ * - `openedAt` sticks to the first open; `emptiedAt` is terminal
+ */
+export async function setCoffeeStatus(id: number, target: BeanStatus): Promise<void> {
+  const [existing] = await db.select().from(coffees).where(eq(coffees.id, id));
+  if (!existing) return;
+
+  const from = toBeanStatus(existing.status);
+  if (!canTransition(from, target)) return;
+
+  const today = todayStr();
+  const patch: Partial<typeof coffees.$inferSelect> = { status: target };
+
+  switch (target) {
+    case "opened":
+      patch.openedAt = existing.openedAt ?? today;
+      patch.unfrozenAt = null; // opening ends any freeze display
+      break;
+    case "frozen":
+      patch.frozenAt = today;
+      patch.unfrozenAt = null;
+      break;
+    case "resting":
+      // store the amount of time spent frozen this session
+      if (from === "frozen" && existing.frozenAt) {
+        patch.frozenDays = existing.frozenDays + dayDiff(existing.frozenAt, today);
+        patch.unfrozenAt = today;
+      }
+      if (from === "empty") patch.emptiedAt = null; // undo mistaken empty
+      break;
+    case "empty":
+      if (existing.frozenAt) {
+        patch.frozenDays = existing.frozenDays + dayDiff(existing.frozenAt, today);
+        patch.unfrozenAt = today;
+      }
+      patch.emptiedAt = today;
+      break;
+  }
+
+  await db
+    .update(coffees)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(coffees.id, id));
+  revalidatePath("/"); revalidatePath("/coffees");
+  revalidatePath(`/coffees/${id}`);
 }
 
 /* ---------- auto photo lookup (roaster storefront) ---------- */

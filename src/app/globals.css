@@ -1859,3 +1859,105 @@ button.clickable {
   font-size: 12.5px;
   color: var(--muted);
 }
+
+/* ---------- coffee status filter (collection page) ---------- */
+
+.status-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 20px;
+}
+
+.chip {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 13px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.chip:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+
+.chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--btn-fg);
+}
+
+/* ---------- coffee status toggle (detail page) ---------- */
+
+.status-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin: 18px 0;
+  max-width: 520px;
+}
+
+.status-toggle-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+
+.status-dot[data-status="resting"] { background: var(--stars); }
+.status-dot[data-status="frozen"]  { background: #5b9bd5; }
+.status-dot[data-status="opened"]  { background: var(--success-fg); }
+.status-dot[data-status="empty"]   { background: var(--muted); }
+
+.status-title {
+  font-weight: 700;
+  font-size: 15px;
+  text-transform: capitalize;
+}
+
+.status-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.status-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.status-meta strong {
+  color: var(--ink);
+}
+
+.status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.status-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
