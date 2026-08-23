@@ -41,6 +41,11 @@ export type GridRow = {
   roastLevel: string | null;
   roastDate: string | null;
   purchaseDate: string | null;
+  openedAt: string | null;
+  frozenAt: string | null;
+  unfrozenAt: string | null;
+  emptiedAt: string | null;
+  frozenDays: number;
   priceCents: number | null;
   weightGrams: number | null;
   rating: number | null;
@@ -90,6 +95,12 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
           roastLevel: row.roastLevel,
           roastDate: row.roastDate,
           purchaseDate: row.purchaseDate,
+          openedAt: row.openedAt,
+          frozenAt: row.frozenAt,
+          unfrozenAt: row.unfrozenAt,
+          emptiedAt: row.emptiedAt,
+          frozenDays: row.frozenDays,
+          status: deriveStatus(row),
           priceCents: row.priceCents,
           weightGrams: row.weightGrams,
           rating: row.rating,
