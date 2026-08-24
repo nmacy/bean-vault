@@ -317,15 +317,12 @@ export type EnrichResult =
   | { ok: true; fields: AiCoffeeFields }
   | { ok: false; message: string };
 
-export async function enrichCoffeePage(url: string, apiKey: string, modelOverride?: string): Promise<EnrichResult> {
-  if (!apiKey) {
-    return { ok: false, message: "OpenRouter API key is not configured." };
-  }
-  const model = modelOverride || DEFAULT_MODEL;
-
-  const text = await fetchPageText(url);
-  if (!text) return { ok: false, message: "Could not read that store page." };
-
+/** A chat-completion call to OpenRouter, returning the assistant's raw text content. */
+async function callOpenRouterChat(
+  apiKey: string,
+  model: string,
+  messages: unknown[],
+): Promise<{ ok: true; content: string } | { ok: false; message: string }> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), AI_TIMEOUT_MS);
   let res: Response;
@@ -338,28 +335,11 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
         "HTTP-Referer": "https://github.com/nmacy/coffee_tracker",
       },
       body: JSON.stringify({
-        model: model,
+        model,
         temperature: 0,
         max_tokens: 2000,
         response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content:
-              "You extract facts about a bag of coffee from a store product page. " +
-              "Return ONLY a JSON object with these keys: country, region, variety, " +
-              "producer (grower or farm), elevation (numbers only, meters above sea " +
-              "level — convert feet if printed, e.g. \"1,900–2,100\"), process, " +
-              "roastLevel (one of: light, medium-light, medium, medium-dark, dark), " +
-              "agtron (the Agtron roast color number if listed, e.g. \"63\"), " +
-              "mix (blend or single-origin), decaffeinated (boolean), tastingNotes " +
-              "(flavor notes: one short sentence describing the taste, e.g. \"sweet citrus, " +
-              "jasmine and a syrupy body\"; null when the page has none), description. " +
-              "Use null when the page does not say. If the page " +
-              "mentions bag size options, ignore them.",
-          },
-          { role: "user", content: `Store page URL: ${url}\n\nPage text:\n${text}` },
-        ],
+        messages,
       }),
       signal: ctrl.signal,
     });
@@ -394,6 +374,14 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
   if (typeof content !== "string") {
     return { ok: false, message: "The AI returned an empty response." };
   }
+  return { ok: true, content };
+}
+
+/** Pull structured coffee fields out of a chat-completion reply, or an error message. */
+function parseFieldsReply<T>(
+  content: string,
+  parse: (data: unknown) => T,
+): { ok: true; fields: T } | { ok: false; message: string } {
   const parsed = extractJson(content);
   if (parsed === null) {
     const preview = content.replace(/\s+/g, " ").slice(0, 160);
@@ -402,7 +390,42 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
       message: `The AI did not return usable JSON. Start of reply: "${preview}"`,
     };
   }
-  const fields = parseFields(parsed);
+  return { ok: true, fields: parse(parsed) };
+}
+
+export async function enrichCoffeePage(url: string, apiKey: string, modelOverride?: string): Promise<EnrichResult> {
+  if (!apiKey) {
+    return { ok: false, message: "OpenRouter API key is not configured." };
+  }
+  const model = modelOverride || DEFAULT_MODEL;
+
+  const text = await fetchPageText(url);
+  if (!text) return { ok: false, message: "Could not read that store page." };
+
+  const reply = await callOpenRouterChat(apiKey, model, [
+    {
+      role: "system",
+      content:
+        "You extract facts about a bag of coffee from a store product page. " +
+        "Return ONLY a JSON object with these keys: country, region, variety, " +
+        "producer (grower or farm), elevation (numbers only, meters above sea " +
+        "level — convert feet if printed, e.g. \"1,900–2,100\"), process, " +
+        "roastLevel (one of: light, medium-light, medium, medium-dark, dark), " +
+        "agtron (the Agtron roast color number if listed, e.g. \"63\"), " +
+        "mix (blend or single-origin), decaffeinated (boolean), tastingNotes " +
+        "(flavor notes: one short sentence describing the taste, e.g. \"sweet citrus, " +
+        "jasmine and a syrupy body\"; null when the page has none), description. " +
+        "Use null when the page does not say. If the page " +
+        "mentions bag size options, ignore them.",
+    },
+    { role: "user", content: `Store page URL: ${url}\n\nPage text:\n${text}` },
+  ]);
+  if (!reply.ok) return reply;
+
+  const result = parseFieldsReply(reply.content, parseFields);
+  if (!result.ok) return result;
+
+  const fields = result.fields;
   // Deterministic fallbacks straight from the page text.
   if (!fields.elevation) fields.elevation = normalizeElevation(findElevation(text) ?? "");
   if (!fields.tastingNotes) fields.tastingNotes = findTastingNotes(text);
@@ -411,4 +434,81 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
     if (agtron !== null) fields.roastLevel = agtronToRoast(agtron);
   }
   return { ok: true, fields };
+}
+
+/** Coffee facts read straight off a bag's label in a photo — plus a roaster/name guess. */
+export type PhotoFields = AiCoffeeFields & { roaster: string | null; name: string | null };
+
+export type PhotoAnalysisResult =
+  | { ok: true; fields: PhotoFields }
+  | { ok: false; message: string };
+
+function parsePhotoFields(data: unknown): PhotoFields {
+  const rec = typeof data === "object" && data !== null ? (data as Record<string, unknown>) : {};
+  return {
+    ...parseFields(data),
+    roaster: cleanString(rec.roaster),
+    name: cleanString(rec.name),
+  };
+}
+
+/** Read a coffee bag's label from a photo (data URL) and extract the same facts as a store page. */
+export async function analyzeCoffeePhoto(
+  photoDataUrl: string,
+  apiKey: string,
+  modelOverride?: string,
+): Promise<PhotoAnalysisResult> {
+  if (!apiKey) {
+    return { ok: false, message: "OpenRouter API key is not configured." };
+  }
+  if (!/^data:image\/[a-z0-9.+-]+;base64,/i.test(photoDataUrl)) {
+    return { ok: false, message: "Not a readable image." };
+  }
+  const model = modelOverride || DEFAULT_MODEL;
+
+  const reply = await callOpenRouterChat(apiKey, model, [
+    {
+      role: "system",
+      content:
+        "You read the label on a photo of a bag of coffee and extract facts about it. " +
+        "Return ONLY a JSON object with these keys: roaster (the company that roasted " +
+        "it), name (the coffee's product/origin name as printed on the bag), country, " +
+        "region, variety, producer (grower or farm), elevation (numbers only, meters " +
+        "above sea level — convert feet if printed, e.g. \"1,900–2,100\"), process, " +
+        "roastLevel (one of: light, medium-light, medium, medium-dark, dark), " +
+        "agtron (the Agtron roast color number if printed, e.g. \"63\"), " +
+        "mix (blend or single-origin), decaffeinated (boolean), tastingNotes (flavor " +
+        "notes printed on the bag, one short phrase), description. Use null for " +
+        "anything not visible or legible in the photo — do not guess.",
+    },
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "Extract the coffee facts from this bag's label." },
+        { type: "image_url", image_url: { url: photoDataUrl } },
+      ],
+    },
+  ]);
+  if (!reply.ok) return reply;
+
+  return parseFieldsReply(reply.content, parsePhotoFields);
+}
+
+/** Merge photo- and product-page-derived fields, preferring the (usually fuller) page facts. */
+export function mergePhotoAndPageFields(photo: PhotoFields, page: AiCoffeeFields): PhotoFields {
+  return {
+    roaster: photo.roaster,
+    name: photo.name,
+    country: page.country ?? photo.country,
+    region: page.region ?? photo.region,
+    variety: page.variety ?? photo.variety,
+    producer: page.producer ?? photo.producer,
+    elevation: page.elevation ?? photo.elevation,
+    process: page.process ?? photo.process,
+    roastLevel: page.roastLevel ?? photo.roastLevel,
+    mix: page.mix ?? photo.mix,
+    decaffeinated: page.decaffeinated || photo.decaffeinated,
+    tastingNotes: page.tastingNotes ?? photo.tastingNotes,
+    description: page.description ?? photo.description,
+  };
 }

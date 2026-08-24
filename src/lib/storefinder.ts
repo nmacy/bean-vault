@@ -16,6 +16,8 @@ export type StoreProduct = {
   slug?: string;
   priceCents?: number | null;
   weightGrams?: number | null;
+  /** The store's own product page for this item, when derivable from the feed. */
+  productUrl?: string | null;
 };
 
 export type StoreVariant = {
@@ -87,7 +89,7 @@ function unescapeHtml(s: string): string {
     .replace(/&(amp|lt|gt|quot|apos|nbsp|rsquo|ldquo|rdquo);/g, (m, e: string) => entities[e] ?? m);
 }
 
-function parseShopifyProducts(data: unknown): StoreProduct[] {
+function parseShopifyProducts(data: unknown, domain: string): StoreProduct[] {
   if (typeof data !== "object" || data === null || !("products" in data)) return [];
   const raw = data.products;
   if (!Array.isArray(raw)) return [];
@@ -102,7 +104,8 @@ function parseShopifyProducts(data: unknown): StoreProduct[] {
       typeof first === "object" && first !== null && "src" in first && typeof first.src === "string"
         ? first.src
         : null;
-    out.push({ title, imageUrl: src });
+    const handle = typeof rec.handle === "string" ? rec.handle : null;
+    out.push({ title, imageUrl: src, productUrl: handle ? `https://${domain}/products/${handle}` : null });
   }
   return out;
 }
@@ -111,7 +114,7 @@ async function fetchShopifyProducts(domain: string): Promise<StoreProduct[]> {
   const products: StoreProduct[] = [];
   for (let page = 1; page <= 12; page++) {
     const data = await fetchJson(`https://${domain}/products.json?limit=250&page=${page}`);
-    const batch = parseShopifyProducts(data);
+    const batch = parseShopifyProducts(data, domain);
     if (batch.length === 0) break;
     products.push(...batch);
     if (batch.length < 250) break;
@@ -153,6 +156,7 @@ async function fetchWooProducts(domain: string): Promise<StoreProduct[]> {
       slug: typeof rec.slug === "string" ? rec.slug : undefined,
       priceCents,
       weightGrams,
+      productUrl: typeof rec.permalink === "string" ? rec.permalink : null,
     });
   }
   return out;

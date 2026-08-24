@@ -50,6 +50,17 @@ run on your own machine or a homelab server; all data stays on your disk.
   image from the roaster's own store page (Shopify or WooCommerce product
   feeds, fuzzy-matched by name, tolerant of typos like "Guatamala" →
   "Guatemala"). One at a time, or a batch run for every missing photo.
+- **AI photo scan** (add/edit forms, needs an OpenRouter key) — reads a coffee
+  bag's label straight from its photo and proposes roaster, name, origin,
+  variety, producer, elevation, process, roast level, blend/single-origin,
+  decaf, tasting notes and notes. If the photo's roaster+name match a product
+  in that roaster's store feed, that product page is read too and its facts
+  (usually fuller) take priority over the photo's. Runs automatically when you
+  pick a photo file, or on demand via "Scan photo for details" for a photo
+  already on the coffee. Nothing is filled in automatically — a review dialog
+  lists every field found with a checkbox, defaulting to all selected; only
+  what you leave checked gets written into the form (overwriting existing
+  values), and nothing is saved until you submit the form yourself.
 - **Import** — Beanconqueror JSON export, Bean Vault JSON backup (photos
   included), or Bean Vault CSV.
 - **Export** — a JSON backup with every photo embedded (restores into Bean
@@ -268,6 +279,13 @@ blend/single-origin, decaf, tasting notes, and the product description as
 notes. This is an assisted draft; nothing is saved until you review. You can
 also re-read an existing coffee's product page and merge in AI-extracted
 details — that "Update from product link" tool lives on the edit page.
+
+The add/edit forms can also **scan a coffee bag's photo** — see "AI photo
+scan" above. It reuses the same OpenRouter key and, when it can match the
+photo to a real product page, the same page-reading path as the link tools
+above; the difference is the review dialog, which lets you pick exactly
+which found fields to apply (including overwriting fields that already have
+a value) rather than filling everything in automatically.
 
 The key can be managed from the app itself: **Settings** saves it in the
 local settings table — server-side only, never sent to the browser and never

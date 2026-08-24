@@ -3,7 +3,9 @@
 import { useActionState, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import Link from "next/link";
 import type { Coffee } from "@/db/schema";
-import type { FormState } from "@/app/actions";
+import { scanCoffeePhoto, type FormState, type PhotoScanResult } from "@/app/actions";
+import PhotoScanModal from "@/components/photo-scan-modal";
+import { applyScanRow, scanRowsFrom, type PhotoScanFieldKey } from "@/lib/photo-scan-fields";
 
 const ROAST_LEVELS = ["light", "medium-light", "medium", "medium-dark", "dark"];
 const PROCESS_SUGGESTIONS = ["washed", "natural", "honey", "anaerobic", "carbonic maceration"];
@@ -39,17 +41,69 @@ type Props = {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
   coffee?: Coffee;
   submitLabel: string;
+  /** Photo scanning only shows up once an OpenRouter key is configured (Settings). */
+  hasAiKey?: boolean;
 };
 
-export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read the file."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+export default function CoffeeForm({ action, coffee, submitLabel, hasAiKey = false }: Props) {
   const [state, formAction, isPending] = useActionState(action, {});
   const [preview, setPreview] = useState<string | null>(null);
   const [currentPhoto, setCurrentPhoto] = useState(coffee?.photoFile ?? null);
   const [removePhoto, setRemovePhoto] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [scanBusy, setScanBusy] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanResult, setScanResult] = useState<Extract<PhotoScanResult, { ok: true }> | null>(null);
+  const [scanSelected, setScanSelected] = useState<Partial<Record<PhotoScanFieldKey, boolean>>>({});
+
   const priceValue = coffee?.priceCents != null ? (coffee.priceCents / 100).toFixed(2) : "";
   const photoHref = currentPhoto ? `/api/photos/${currentPhoto}` : null;
+
+  async function runScan(dataUrl: string) {
+    setScanBusy(true);
+    setScanError(null);
+    const res = await scanCoffeePhoto(dataUrl);
+    setScanBusy(false);
+    if (!res.ok) {
+      setScanError(res.message);
+      return;
+    }
+    setScanResult(res);
+    const rows = scanRowsFrom(res.fields);
+    setScanSelected(Object.fromEntries(rows.map((r) => [r.key, true])));
+  }
+
+  async function scanCurrentPhoto() {
+    const file = fileRef.current?.files?.[0];
+    if (file) {
+      void runScan(await blobToDataUrl(file));
+    } else if (photoHref) {
+      const res = await fetch(photoHref);
+      void runScan(await blobToDataUrl(await res.blob()));
+    }
+  }
+
+  function toggleScanField(key: PhotoScanFieldKey) {
+    setScanSelected((s) => ({ ...s, [key]: !s[key] }));
+  }
+
+  function applyScan() {
+    if (!scanResult) return;
+    for (const row of scanRowsFrom(scanResult.fields)) {
+      if (scanSelected[row.key]) applyScanRow(row);
+    }
+    setScanResult(null);
+  }
 
   return (
     <div className="form-card">
@@ -179,12 +233,27 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
                   setPreview(URL.createObjectURL(file));
                   setCurrentPhoto(null);
                   setRemovePhoto(false);
+                  if (hasAiKey) void blobToDataUrl(file).then(runScan);
                 } else {
                   setPreview(null);
                 }
               }}
             />
           </div>
+          {hasAiKey && (preview || photoHref) ? (
+            <div className="field wide">
+              <button
+                type="button"
+                className="btn btn-small btn-secondary"
+                onClick={() => void scanCurrentPhoto()}
+                disabled={scanBusy}
+              >
+                <span className="ai-badge" style={{ marginRight: 6 }}>AI</span>
+                {scanBusy ? "Scanning photo…" : "Scan photo for details"}
+              </button>
+              {scanError ? <div className="form-error" style={{ marginTop: 8 }}>{scanError}</div> : null}
+            </div>
+          ) : null}
           {preview ? (
             <div className="field wide">
               <span className="hint">New photo:</span>
@@ -228,6 +297,16 @@ export default function CoffeeForm({ action, coffee, submitLabel }: Props) {
           <Link href={coffee ? `/coffees/${coffee.id}` : "/"} className="btn secondary">Cancel</Link>
         </div>
       </form>
+      {scanResult ? (
+        <PhotoScanModal
+          rows={scanRowsFrom(scanResult.fields)}
+          productUrl={scanResult.productUrl}
+          selected={scanSelected}
+          onToggle={toggleScanField}
+          onApply={applyScan}
+          onClose={() => setScanResult(null)}
+        />
+      ) : null}
     </div>
   );
 }
