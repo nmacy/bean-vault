@@ -3,6 +3,11 @@
 import { useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "bean-vault:theme";
+// Some WebKit browsers (e.g. Orion, or Safari with "Block All Cookies") throw
+// on localStorage writes when a site's storage access is restricted, even
+// though it isn't fully private/incognito. A first-party cookie survives
+// that case, so the bootstrap script in layout.tsx falls back to reading it.
+const COOKIE_KEY = "bean_vault_theme";
 
 const listeners = new Set<() => void>();
 
@@ -19,10 +24,16 @@ function getSnapshot(): boolean {
 
 function applyTheme(dark: boolean) {
   document.documentElement.classList.toggle("dark", dark);
+  const value = dark ? "dark" : "light";
   try {
-    localStorage.setItem(STORAGE_KEY, dark ? "dark" : "light");
-  } catch {
-    /* storage unavailable */
+    localStorage.setItem(STORAGE_KEY, value);
+  } catch (err) {
+    console.warn("bean-vault: could not persist theme to localStorage", err);
+  }
+  try {
+    document.cookie = `${COOKIE_KEY}=${value}; path=/; max-age=31536000; samesite=lax`;
+  } catch (err) {
+    console.warn("bean-vault: could not persist theme cookie", err);
   }
   for (const cb of listeners) cb();
 }
