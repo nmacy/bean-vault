@@ -378,7 +378,7 @@ export async function setCoffeeStatus(id: number, target: BeanStatus): Promise<v
       if (from === "empty") patch.emptiedAt = null; // undo mistaken empty
       break;
     case "empty":
-      if (existing.frozenAt) {
+      if (from === "frozen" && existing.frozenAt) {
         patch.frozenDays = existing.frozenDays + dayDiff(existing.frozenAt, today);
         patch.unfrozenAt = today;
       }
