@@ -22,8 +22,8 @@ run on your own machine or a homelab server; all data stays on your disk.
   field with a direction toggle. Switching between tiles and grid keeps the
   same filters and sort applied — it's shared state, not per-view. The grid's
   column headers are an alternate way to set the same sort. A separate
-  status filter (resting/frozen/opened/empty) sits above it. All of it
-  persists between visits.
+  status filter (available/opened/resting/frozen/empty/all, where "available"
+  means any non-empty bag) sits above it. All of it persists between visits.
 - **Spreadsheet grid editing** (`/coffees`, grid view) — toggle between tiles
   and a table to edit any number of coffees. Cells **auto-save when you leave
   them**, with live forced formatting and validation:
