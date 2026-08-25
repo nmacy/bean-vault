@@ -73,7 +73,9 @@ run on your own machine or a homelab server; all data stays on your disk.
   edit a bag, including "Update from a link" (paste the roaster's homepage
   and AI merges in profile details, logo included). Renaming a roaster
   updates every bag's `roaster` field to match. Deleting is blocked while any
-  bag still references it.
+  bag still references it — and the reverse happens automatically too: if
+  deleting a bag or moving it to a different roaster leaves a roaster with no
+  bags left, that now-empty roaster is removed on the spot.
 - **Import** — Beanconqueror JSON export, Bean Vault JSON backup (photos
   included), or Bean Vault CSV.
 - **Export** — a JSON backup with every photo embedded (restores into Bean
@@ -361,8 +363,8 @@ Missing or invalid keys get `401 {"error":"Unauthorized"}`.
 | `/api/v1/coffees` | GET | — | List all coffees (newest first) |
 | `/api/v1/coffees` | POST | coffee fields | Create |
 | `/api/v1/coffees/:id` | GET | — | Get one coffee |
-| `/api/v1/coffees/:id` | PATCH | fields to change | Merge-update; `null` clears a field |
-| `/api/v1/coffees/:id` | DELETE | — | Delete (also removes its photo file) |
+| `/api/v1/coffees/:id` | PATCH | fields to change | Merge-update; `null` clears a field. Changing `roaster` also removes the old roaster if it is left with no bags |
+| `/api/v1/coffees/:id` | DELETE | — | Delete (also removes its photo file and, if it was the roaster's last bag, that now-empty roaster) |
 | `/api/v1/roasters` | GET | — | List all roasters (by name) |
 | `/api/v1/roasters` | POST | roaster fields | Create. `409` if the name already exists (case-insensitive) |
 | `/api/v1/roasters/:id` | GET | — | Get one roaster |

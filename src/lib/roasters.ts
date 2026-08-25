@@ -5,9 +5,10 @@
  * existing roaster's data; only touches name/timestamps on first creation.
  */
 
-import { inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { coffees, roasters } from "@/db/schema";
+import { deletePhoto } from "@/lib/photos";
 
 export async function findRoasterByName(name: string) {
   const trimmed = name.trim();
@@ -85,4 +86,18 @@ export async function countRoasterCoffees(roasterId: number, name: string): Prom
     .from(coffees)
     .where(sql`${coffees.roasterId} = ${roasterId} or lower(${coffees.roaster}) = lower(${name})`);
   return row?.count ?? 0;
+}
+
+/**
+ * Delete a roaster (and its logo) if no coffee references it any more —
+ * a no-op otherwise. Called after any action that can strand a roaster with
+ * zero bags (deleting a coffee, or renaming one away from its roaster).
+ */
+export async function pruneRoasterIfEmpty(name: string): Promise<void> {
+  const roaster = await findRoasterByName(name);
+  if (!roaster) return;
+  const count = await countRoasterCoffees(roaster.id, roaster.name);
+  if (count > 0) return;
+  await db.delete(roasters).where(eq(roasters.id, roaster.id));
+  await deletePhoto(roaster.logoFile);
 }

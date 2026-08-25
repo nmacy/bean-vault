@@ -4,7 +4,7 @@ import { coffees } from "@/db/schema";
 import { authenticate } from "@/lib/api-auth";
 import { joinOrigin, mapCoffeeFields } from "@/lib/api-fields";
 import { deletePhoto, downloadRemoteImage, savePhotoBytes } from "@/lib/photos";
-import { ensureRoaster } from "@/lib/roasters";
+import { ensureRoaster, pruneRoasterIfEmpty } from "@/lib/roasters";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +88,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .set({ ...changes, photoFile, updatedAt: new Date() })
     .where(eq(coffees.id, id))
     .returning();
+
+  if (changes.roaster !== undefined && changes.roaster.toLowerCase() !== existing.roaster.toLowerCase()) {
+    await pruneRoasterIfEmpty(existing.roaster);
+  }
+
   return json(updated);
 }
 
@@ -100,5 +105,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!existing) return json({ error: "Not found." }, 404);
   await db.delete(coffees).where(eq(coffees.id, id));
   await deletePhoto(existing.photoFile);
+  await pruneRoasterIfEmpty(existing.roaster);
   return json({ ok: true });
 }

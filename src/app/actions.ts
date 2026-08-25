@@ -23,7 +23,7 @@ import {
 } from "@/lib/ai";
 import { addApiKey as storeApiKey, revokeApiKey as dropApiKey } from "@/lib/api-auth";
 import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
-import { countRoasterCoffees, ensureRoaster, ensureRoasters, renameRoasterCoffees } from "@/lib/roasters";
+import { countRoasterCoffees, ensureRoaster, ensureRoasters, pruneRoasterIfEmpty, renameRoasterCoffees } from "@/lib/roasters";
 import { canTransition, deriveStatus, toBeanStatus, todayStr, type BeanStatus } from "@/lib/status";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -331,7 +331,11 @@ export async function updateCoffee(id: number, _prev: FormState, formData: FormD
     })
     .where(eq(coffees.id, id));
 
-  revalidatePath("/"); revalidatePath("/coffees");
+  if (input.roaster.trim().toLowerCase() !== existing.roaster.trim().toLowerCase()) {
+    await pruneRoasterIfEmpty(existing.roaster);
+  }
+
+  revalidatePath("/"); revalidatePath("/coffees"); revalidatePath("/roasters");
   revalidatePath(`/coffees/${id}`);
   revalidatePath(`/coffees/${id}/edit`);
   redirect(`/coffees/${id}`);
@@ -342,7 +346,8 @@ export async function deleteCoffee(id: number): Promise<void> {
   if (!existing) return;
   await db.delete(coffees).where(eq(coffees.id, id));
   await deletePhoto(existing.photoFile);
-  revalidatePath("/"); revalidatePath("/coffees");
+  await pruneRoasterIfEmpty(existing.roaster);
+  revalidatePath("/"); revalidatePath("/coffees"); revalidatePath("/roasters");
   redirect("/coffees");
 }
 
