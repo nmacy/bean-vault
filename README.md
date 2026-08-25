@@ -161,7 +161,10 @@ let you set a freeze span directly instead of using the Freeze/Unfreeze
 buttons. If you complete a span that way (both dates set, changed from what
 was saved) and leave `frozenDays` untouched, saving folds that span into
 `frozenDays` automatically — the same bookkeeping the buttons do. Type a
-`frozenDays` value yourself in the same edit and that value is kept as-is.
+`frozenDays` value yourself in the same edit and that value is kept, unless
+it's less than the span `frozenAt`→`unfrozenAt` itself covers — `frozenDays`
+is cumulative, so it's floored at that span rather than saved as a value the
+dates prove is too low.
 
 ## Importing from Beanconqueror
 
