@@ -76,6 +76,30 @@ export type BagDates = {
 };
 
 /**
+ * `frozenDays` is meant to already include the most recent completed freeze
+ * (frozenAt → unfrozenAt) — that's what setCoffeeStatus's fold-on-unfreeze
+ * does. But frozenAt/unfrozenAt/frozenDays are also directly editable (the
+ * edit form's raw lifecycle fields), which can complete a freeze span
+ * without anyone updating frozenDays to match.
+ *
+ * If this edit is what changed the span (frozenAt or unfrozenAt differs
+ * from what's stored) and the submitted frozenDays is otherwise identical
+ * to what's stored (so nobody typed a deliberate override), fold the new
+ * span in automatically. Otherwise trust the submitted value as-is.
+ */
+export function reconcileFrozenDays(
+  existing: { frozenAt: string | null; unfrozenAt: string | null; frozenDays: number },
+  input: { frozenAt: string | null; unfrozenAt: string | null; frozenDays: number },
+): number {
+  const spanChanged = input.frozenAt !== existing.frozenAt || input.unfrozenAt !== existing.unfrozenAt;
+  const frozenDaysUntouched = input.frozenDays === existing.frozenDays;
+  if (input.frozenAt && input.unfrozenAt && spanChanged && frozenDaysUntouched) {
+    return input.frozenDays + Math.max(0, dayDiff(input.frozenAt, input.unfrozenAt));
+  }
+  return input.frozenDays;
+}
+
+/**
  * Days the bag has been resting — i.e. since roast, minus any time frozen.
  * Stops accumulating once `emptiedAt` is set; `today` only for tests.
  * Returns null when there is no roast date.

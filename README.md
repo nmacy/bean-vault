@@ -33,10 +33,12 @@ run on your own machine or a homelab server; all data stays on your disk.
   - unsaved edits trigger a leave-page warning;
   - show/hide columns (persisted separately, grid-only).
   - Lifecycle fields are editable too — opened/frozen/unfrozen/emptied dates
-    and cumulative frozen days, same raw fields the edit form exposes. Status
-    is a read-only column derived from those dates (as on the edit form),
-    not independently settable — edit the surrounding dates to move a bag
-    through its lifecycle from the grid; one-click Freeze/Open/Empty buttons
+    and cumulative frozen days, same raw fields the edit form exposes, with
+    the same auto-fold onto `frozenDays` when a saved row completes a freeze
+    span without an explicit `frozenDays` edit. Status is a read-only column
+    derived from those dates (as on the edit form), not independently
+    settable — edit the surrounding dates to move a bag through its
+    lifecycle from the grid; one-click Freeze/Open/Empty buttons
     remain on the detail page.
 - **Bag lifecycle** — each bag is `resting` by default and moves through a
   small state machine: `resting ⇄ frozen`, `resting → opened`, `frozen →
@@ -153,6 +155,13 @@ machine (`src/lib/status.ts`). Transitions from → to:
 
 Transitioning happens on the coffee detail page; the button label reflects the
 action (Freeze / Unfreeze / Open / Empty / Resting).
+
+The edit form's (and grid's) raw `frozenAt`/`unfrozenAt`/`frozenDays` fields
+let you set a freeze span directly instead of using the Freeze/Unfreeze
+buttons. If you complete a span that way (both dates set, changed from what
+was saved) and leave `frozenDays` untouched, saving folds that span into
+`frozenDays` automatically — the same bookkeeping the buttons do. Type a
+`frozenDays` value yourself in the same edit and that value is kept as-is.
 
 ## Importing from Beanconqueror
 

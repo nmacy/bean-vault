@@ -21,7 +21,7 @@ import {
 } from "@/lib/ai";
 import { addApiKey as storeApiKey, revokeApiKey as dropApiKey } from "@/lib/api-auth";
 import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
-import { canTransition, dayDiff, deriveStatus, toBeanStatus, todayStr, type BeanStatus } from "@/lib/status";
+import { canTransition, dayDiff, deriveStatus, reconcileFrozenDays, toBeanStatus, todayStr, type BeanStatus } from "@/lib/status";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
@@ -87,6 +87,11 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
         skipped += 1;
         continue;
       }
+      const [existing] = tx.select().from(coffees).where(eq(coffees.id, row.id)).all();
+      if (!existing) {
+        skipped += 1;
+        continue;
+      }
       const result = tx
         .update(coffees)
         .set({
@@ -107,7 +112,7 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
           frozenAt: row.frozenAt,
           unfrozenAt: row.unfrozenAt,
           emptiedAt: row.emptiedAt,
-          frozenDays: row.frozenDays,
+          frozenDays: reconcileFrozenDays(existing, row),
           status: deriveStatus(row),
           priceCents: row.priceCents,
           weightGrams: row.weightGrams,
@@ -319,6 +324,7 @@ export async function updateCoffee(id: number, _prev: FormState, formData: FormD
       roaster: input.roaster,
       name: input.name,
       ...fields(input),
+      frozenDays: reconcileFrozenDays(existing, input),
       origin: joinOrigin(input.country, input.region),
       photoFile: photo,
       updatedAt: new Date(),
