@@ -21,7 +21,7 @@ import {
 } from "@/lib/ai";
 import { addApiKey as storeApiKey, revokeApiKey as dropApiKey } from "@/lib/api-auth";
 import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
-import { canTransition, dayDiff, deriveStatus, toBeanStatus, todayStr, type BeanStatus } from "@/lib/status";
+import { canTransition, dayDiff, deriveStatus, reconcileFrozenDays, toBeanStatus, todayStr, type BeanStatus } from "@/lib/status";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
@@ -319,6 +319,7 @@ export async function updateCoffee(id: number, _prev: FormState, formData: FormD
       roaster: input.roaster,
       name: input.name,
       ...fields(input),
+      frozenDays: reconcileFrozenDays(existing, input),
       origin: joinOrigin(input.country, input.region),
       photoFile: photo,
       updatedAt: new Date(),

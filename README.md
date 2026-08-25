@@ -154,6 +154,13 @@ machine (`src/lib/status.ts`). Transitions from → to:
 Transitioning happens on the coffee detail page; the button label reflects the
 action (Freeze / Unfreeze / Open / Empty / Resting).
 
+The edit form's raw `frozenAt`/`unfrozenAt`/`frozenDays` fields let you set a
+freeze span directly instead of using the Freeze/Unfreeze buttons. If you
+complete a span that way (both dates set, changed from what was saved) and
+leave `frozenDays` untouched, saving folds that span into `frozenDays`
+automatically — the same bookkeeping the buttons do. Type a `frozenDays`
+value yourself in the same edit and that value is kept as-is.
+
 ## Importing from Beanconqueror
 
 Imports live in **Settings → Import**.
