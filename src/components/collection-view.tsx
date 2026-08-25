@@ -40,7 +40,6 @@ export type BeanItem = {
   frozenAt: string | null;
   unfrozenAt: string | null;
   emptiedAt: string | null;
-  frozenDays: number;
   priceCents: number | null;
   weightGrams: number | null;
   rating: number | null;

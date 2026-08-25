@@ -27,7 +27,6 @@ export default async function CoffeesPage() {
       frozenAt: coffees.frozenAt,
       unfrozenAt: coffees.unfrozenAt,
       emptiedAt: coffees.emptiedAt,
-      frozenDays: coffees.frozenDays,
       priceCents: coffees.priceCents,
       weightGrams: coffees.weightGrams,
       rating: coffees.rating,

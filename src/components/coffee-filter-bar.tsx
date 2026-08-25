@@ -28,7 +28,6 @@ export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "frozenAt", label: "Frozen date" },
   { key: "unfrozenAt", label: "Unfrozen date" },
   { key: "emptiedAt", label: "Emptied date" },
-  { key: "frozenDays", label: "Frozen days" },
   { key: "price", label: "Price" },
   { key: "weight", label: "Weight" },
   { key: "rating", label: "Rating" },

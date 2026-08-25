@@ -1,0 +1,1 @@
+ALTER TABLE `coffees` DROP COLUMN `frozen_days`;

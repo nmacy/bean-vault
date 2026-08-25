@@ -32,10 +32,8 @@ run on your own machine or a homelab server; all data stays on your disk.
   - roaster/name cannot be emptied;
   - unsaved edits trigger a leave-page warning;
   - show/hide columns (persisted separately, grid-only).
-  - Lifecycle fields are editable too — opened/frozen/unfrozen/emptied dates
-    and cumulative frozen days, same raw fields the edit form exposes, with
-    the same auto-fold onto `frozenDays` when a saved row completes a freeze
-    span without an explicit `frozenDays` edit. Status is a read-only column
+  - Lifecycle fields are editable too — opened/frozen/unfrozen/emptied dates,
+    same raw fields the edit form exposes. Status is a read-only column
     derived from those dates (as on the edit form), not independently
     settable — edit the surrounding dates to move a bag through its
     lifecycle from the grid; one-click Freeze/Open/Empty buttons
@@ -44,8 +42,11 @@ run on your own machine or a homelab server; all data stays on your disk.
   small state machine: `resting ⇄ frozen`, `resting → opened`, `frozen →
   empty`, `opened → frozen`, and `opened → empty`; emptying is undoable back
   to `resting`. The app tracks **resting days** (since roast, minus time
-  frozen), **open days**, and cumulative **frozen days**. You can also
-  re-freeze an opened bag — freezing pauses the resting clock.
+  frozen) and **open days**. Frozen time comes straight from `frozenAt`/
+  `unfrozenAt` — a bag is assumed to be frozen at most once, so there's no
+  separate stored tally to keep in sync. Re-freezing after an unfreeze is
+  still possible from the UI, but only the most recent freeze span counts
+  toward resting time; an earlier one is overwritten.
 - **Add by store link** — paste a roaster product URL and the app resolves the
   product page to its name, origin facts, and purchase options (bag sizes).
 - **Photo auto-find** — bags without a snapshot can pull the real product
@@ -146,8 +147,10 @@ machine (`src/lib/status.ts`). Transitions from → to:
 
 - `resting` — the default. Resting days = days since roast, minus any time
   frozen. Stops accumulating once the bag is emptied.
-- `frozen` — pauses the resting clock; cumulative `frozenDays` is recorded.
-  Unfreezing resumes resting.
+- `frozen` — pauses the resting clock. Assumed to happen at most once per
+  bag: frozen time is `frozenAt`→`unfrozenAt` (or `frozenAt`→today while
+  still frozen), computed on the fly rather than stored. Unfreezing resumes
+  resting.
 - `opened` — tracks open days from `openedAt`. An opened bag can still be
   frozen.
 - `empty` — terminal (set `emptiedAt`). Empties can be undone back to
@@ -156,15 +159,12 @@ machine (`src/lib/status.ts`). Transitions from → to:
 Transitioning happens on the coffee detail page; the button label reflects the
 action (Freeze / Unfreeze / Open / Empty / Resting).
 
-The edit form's (and grid's) raw `frozenAt`/`unfrozenAt`/`frozenDays` fields
-let you set a freeze span directly instead of using the Freeze/Unfreeze
-buttons. If you complete a span that way (both dates set, changed from what
-was saved) and leave `frozenDays` untouched, saving folds that span into
-`frozenDays` automatically — the same bookkeeping the buttons do. Type a
-`frozenDays` value yourself in the same edit and that value is kept, unless
-it's less than the span `frozenAt`→`unfrozenAt` itself covers — `frozenDays`
-is cumulative, so it's floored at that span rather than saved as a value the
-dates prove is too low.
+The edit form's (and grid's) raw `frozenAt`/`unfrozenAt` fields let you set a
+freeze span directly instead of using the Freeze/Unfreeze buttons — resting
+days is computed from whatever ends up stored there, so there's no separate
+field to keep in sync. Since a bag is assumed frozen only once, re-freezing
+(via either the buttons or these raw fields) overwrites the earlier span —
+only the most recent freeze counts toward resting time.
 
 ## Importing from Beanconqueror
 
@@ -428,9 +428,8 @@ string clears a field on PATCH.
 | `status` | `string` | Bag lifecycle: `resting`, `frozen`, `opened`, or `empty`. Managed via the app, not the API. |
 | `openedAt` | `string \| null` | `YYYY-MM-DD` the bag was first opened. |
 | `emptiedAt` | `string \| null` | `YYYY-MM-DD` the bag was emptied (terminal). |
-| `frozenAt` | `string \| null` | `YYYY-MM-DD` the current (or most recent) freeze began. |
-| `unfrozenAt` | `string \| null` | `YYYY-MM-DD` the most recent freeze ended. |
-| `frozenDays` | `integer` | Cumulative full days spent frozen. |
+| `frozenAt` | `string \| null` | `YYYY-MM-DD` the (single) freeze began. |
+| `unfrozenAt` | `string \| null` | `YYYY-MM-DD` that freeze ended. |
 | `aiEnriched` | `boolean` | Set when the AI assisted an entry. |
 | `sourceUuid` | `string \| null` | Beanconqueror import id (dedupe). |
 | `photoFile` | `string \| null` | Stored photo filename; manage photos via `photoUrl`. |
@@ -459,7 +458,6 @@ string clears a field on PATCH.
   "emptiedAt": null,
   "frozenAt": null,
   "unfrozenAt": null,
-  "frozenDays": 0,
   "priceCents": 2600,
   "weightGrams": 340,
   "rating": 5,

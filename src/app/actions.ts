@@ -21,7 +21,7 @@ import {
 } from "@/lib/ai";
 import { addApiKey as storeApiKey, revokeApiKey as dropApiKey } from "@/lib/api-auth";
 import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
-import { canTransition, dayDiff, deriveStatus, reconcileFrozenDays, toBeanStatus, todayStr, type BeanStatus } from "@/lib/status";
+import { canTransition, deriveStatus, toBeanStatus, todayStr, type BeanStatus } from "@/lib/status";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
@@ -53,7 +53,6 @@ export type GridRow = {
   frozenAt: string | null;
   unfrozenAt: string | null;
   emptiedAt: string | null;
-  frozenDays: number;
   priceCents: number | null;
   weightGrams: number | null;
   rating: number | null;
@@ -87,11 +86,6 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
         skipped += 1;
         continue;
       }
-      const [existing] = tx.select().from(coffees).where(eq(coffees.id, row.id)).all();
-      if (!existing) {
-        skipped += 1;
-        continue;
-      }
       const result = tx
         .update(coffees)
         .set({
@@ -112,7 +106,6 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
           frozenAt: row.frozenAt,
           unfrozenAt: row.unfrozenAt,
           emptiedAt: row.emptiedAt,
-          frozenDays: reconcileFrozenDays(existing, row),
           status: deriveStatus(row),
           priceCents: row.priceCents,
           weightGrams: row.weightGrams,
@@ -209,7 +202,6 @@ function collect(form: FormData) {
     emptiedAt: dateField(form, "emptiedAt"),
     frozenAt: dateField(form, "frozenAt"),
     unfrozenAt: dateField(form, "unfrozenAt"),
-    frozenDays: intField(form, "frozenDays", 0, 1_000_000) ?? 0,
     priceCents,
     weightGrams,
     rating: intField(form, "rating", 1, 5),
@@ -253,7 +245,6 @@ export async function createCoffee(_prev: FormState, formData: FormData): Promis
       emptiedAt: input.emptiedAt,
       frozenAt: input.frozenAt,
       unfrozenAt: input.unfrozenAt,
-      frozenDays: input.frozenDays,
       status: deriveStatus(input),
       priceCents: input.priceCents,
       weightGrams: input.weightGrams,
@@ -287,7 +278,6 @@ function fields(input: Collected) {
     emptiedAt: input.emptiedAt,
     frozenAt: input.frozenAt,
     unfrozenAt: input.unfrozenAt,
-    frozenDays: input.frozenDays,
     status: deriveStatus(input),
     priceCents: input.priceCents,
     weightGrams: input.weightGrams,
@@ -324,7 +314,6 @@ export async function updateCoffee(id: number, _prev: FormState, formData: FormD
       roaster: input.roaster,
       name: input.name,
       ...fields(input),
-      frozenDays: reconcileFrozenDays(existing, input),
       origin: joinOrigin(input.country, input.region),
       photoFile: photo,
       updatedAt: new Date(),
@@ -352,8 +341,9 @@ export async function deleteCoffee(id: number): Promise<void> {
  * Transition a bag to `target`. The state machine (see src/lib/status.ts)
  * guards legal transitions; illegal ones are no-ops. Date bookkeeping:
  *
- * - frozen time is folded into `frozenDays` the moment you leave the frozen
- *   state, and `restingDays` adds the current freeze while still frozen
+ * - a bag is assumed to be frozen at most once; `unfrozenAt` marks the end
+ *   of that span and `restingDays` derives frozen time straight from
+ *   frozenAt/unfrozenAt rather than a running counter
  * - `openedAt` sticks to the first open; `emptiedAt` is terminal
  */
 export async function setCoffeeStatus(id: number, target: BeanStatus): Promise<void> {
@@ -376,18 +366,11 @@ export async function setCoffeeStatus(id: number, target: BeanStatus): Promise<v
       patch.unfrozenAt = null;
       break;
     case "resting":
-      // store the amount of time spent frozen this session
-      if (from === "frozen" && existing.frozenAt) {
-        patch.frozenDays = existing.frozenDays + dayDiff(existing.frozenAt, today);
-        patch.unfrozenAt = today;
-      }
+      if (from === "frozen") patch.unfrozenAt = today;
       if (from === "empty") patch.emptiedAt = null; // undo mistaken empty
       break;
     case "empty":
-      if (from === "frozen" && existing.frozenAt) {
-        patch.frozenDays = existing.frozenDays + dayDiff(existing.frozenAt, today);
-        patch.unfrozenAt = today;
-      }
+      if (from === "frozen") patch.unfrozenAt = today;
       patch.emptiedAt = today;
       break;
   }
