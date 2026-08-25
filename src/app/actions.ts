@@ -87,6 +87,11 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
         skipped += 1;
         continue;
       }
+      const [existing] = tx.select().from(coffees).where(eq(coffees.id, row.id)).all();
+      if (!existing) {
+        skipped += 1;
+        continue;
+      }
       const result = tx
         .update(coffees)
         .set({
@@ -107,7 +112,7 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
           frozenAt: row.frozenAt,
           unfrozenAt: row.unfrozenAt,
           emptiedAt: row.emptiedAt,
-          frozenDays: row.frozenDays,
+          frozenDays: reconcileFrozenDays(existing, row),
           status: deriveStatus(row),
           priceCents: row.priceCents,
           weightGrams: row.weightGrams,
