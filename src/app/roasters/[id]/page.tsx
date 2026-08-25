@@ -30,9 +30,9 @@ export default async function RoasterDetailPage({ params }: { params: Promise<{ 
     <main className="page">
       <Link href="/roasters" className="back-link">← Back to roasters</Link>
       <div className="detail">
-        <div className="detail-photo">
+        <div className="detail-photo roaster-logo">
           {logoSrc ? (
-            <img src={logoSrc} alt={roaster.name} style={{ objectFit: "contain" }} />
+            <img src={logoSrc} alt={roaster.name} />
           ) : (
             <div className="placeholder">{roaster.name[0]?.toUpperCase() ?? "?"}</div>
           )}
