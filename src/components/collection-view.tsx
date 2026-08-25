@@ -49,7 +49,7 @@ export type BeanItem = {
 };
 
 const STATUS_KEY = "bean-vault:coffees-status";
-const VALID_STATUSES = ["all", "resting", "frozen", "opened", "empty"];
+const VALID_STATUSES = ["available", "opened", "resting", "frozen", "empty", "all"];
 
 function parseView(raw: string): "tiles" | "grid" | null {
   return raw === "tiles" || raw === "grid" ? raw : null;
@@ -73,6 +73,7 @@ export default function CollectionView({ beans }: { beans: BeanItem[] }) {
 
   const byStatus = useMemo(() => {
     if (status === "all") return beans;
+    if (status === "available") return beans.filter((b) => b.status !== "empty");
     return beans.filter((b) => b.status === status);
   }, [beans, status]);
 
@@ -129,7 +130,7 @@ export default function CollectionView({ beans }: { beans: BeanItem[] }) {
       </div>
 
       <div className="status-filter" role="group" aria-label="Filter by status">
-        {(["all", "resting", "frozen", "opened", "empty"] as const).map((s) => (
+        {(["available", "opened", "resting", "frozen", "empty", "all"] as const).map((s) => (
           <button
             key={s}
             type="button"
@@ -137,7 +138,12 @@ export default function CollectionView({ beans }: { beans: BeanItem[] }) {
             onClick={() => setStatus(s)}
           >
             {s === "all" ? "All" : s[0].toUpperCase() + s.slice(1)} (
-            {s === "all" ? beans.length : beans.filter((b) => b.status === s).length})
+            {s === "all"
+              ? beans.length
+              : s === "available"
+                ? beans.filter((b) => b.status !== "empty").length
+                : beans.filter((b) => b.status === s).length}
+            )
           </button>
         ))}
       </div>
