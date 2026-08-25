@@ -85,18 +85,22 @@ export type BagDates = {
  * If this edit is what changed the span (frozenAt or unfrozenAt differs
  * from what's stored) and the submitted frozenDays is otherwise identical
  * to what's stored (so nobody typed a deliberate override), fold the new
- * span in automatically. Otherwise trust the submitted value as-is.
+ * span in automatically. Otherwise trust the submitted value — but never
+ * below what frozenAt/unfrozenAt themselves prove happened; frozenDays is
+ * cumulative, so it can't be less than the one span the dates show.
  */
 export function reconcileFrozenDays(
   existing: { frozenAt: string | null; unfrozenAt: string | null; frozenDays: number },
   input: { frozenAt: string | null; unfrozenAt: string | null; frozenDays: number },
 ): number {
+  if (!input.frozenAt || !input.unfrozenAt) return input.frozenDays;
+  const span = Math.max(0, dayDiff(input.frozenAt, input.unfrozenAt));
   const spanChanged = input.frozenAt !== existing.frozenAt || input.unfrozenAt !== existing.unfrozenAt;
   const frozenDaysUntouched = input.frozenDays === existing.frozenDays;
-  if (input.frozenAt && input.unfrozenAt && spanChanged && frozenDaysUntouched) {
-    return input.frozenDays + Math.max(0, dayDiff(input.frozenAt, input.unfrozenAt));
+  if (spanChanged && frozenDaysUntouched) {
+    return input.frozenDays + span;
   }
-  return input.frozenDays;
+  return Math.max(input.frozenDays, span);
 }
 
 /**
