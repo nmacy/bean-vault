@@ -159,3 +159,70 @@ export function mapCoffeeFields(
 
   return { values, errors };
 }
+
+export type RoasterFieldValues = Partial<{
+  name: string;
+  website: string | null;
+  state: string | null;
+  country: string | null;
+  description: string | null;
+  specialty: string | null;
+  foundedYear: number | null;
+}>;
+
+export type RoasterMapResult = { values: RoasterFieldValues; errors: string[] };
+
+const CURRENT_YEAR = new Date().getFullYear();
+
+export function mapRoasterFields(
+  body: Record<string, unknown>,
+  opts: { partial: boolean },
+): RoasterMapResult {
+  const values: RoasterFieldValues = {};
+  const errors: string[] = [];
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
+
+  const str = (k: string, max: number): string | null | undefined => {
+    if (!has(k)) return undefined;
+    const v = body[k];
+    if (v === null) return null;
+    if (typeof v !== "string") {
+      errors.push(`${k} must be a string.`);
+      return null;
+    }
+    const t = v.trim();
+    if (!t) return null;
+    return t.length > max ? t.slice(0, max) : t;
+  };
+
+  const name = str("name", LIMITS.roasterName);
+  if (name !== undefined) {
+    if (!name) errors.push(opts.partial ? "name cannot be empty." : "name is required.");
+    else values.name = name;
+  } else if (!opts.partial) {
+    errors.push("name is required.");
+  }
+
+  const website = str("website", LIMITS.roasterWebsite);
+  const state = str("state", LIMITS.roasterState);
+  const country = str("country", LIMITS.roasterCountry);
+  const description = str("description", LIMITS.roasterDescription);
+  const specialty = str("specialty", LIMITS.roasterSpecialty);
+  if (website !== undefined) values.website = website;
+  if (state !== undefined) values.state = state;
+  if (country !== undefined) values.country = country;
+  if (description !== undefined) values.description = description;
+  if (specialty !== undefined) values.specialty = specialty;
+
+  if (has("foundedYear")) {
+    const y = body.foundedYear;
+    if (y === null || y === "") values.foundedYear = null;
+    else if (typeof y !== "number" || !Number.isInteger(y) || y < 1600 || y > CURRENT_YEAR) {
+      errors.push(`foundedYear must be an integer between 1600 and ${CURRENT_YEAR}.`);
+    } else {
+      values.foundedYear = y;
+    }
+  }
+
+  return { values, errors };
+}

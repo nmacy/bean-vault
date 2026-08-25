@@ -4,6 +4,7 @@ import { coffees } from "@/db/schema";
 import { authenticate } from "@/lib/api-auth";
 import { joinOrigin, mapCoffeeFields } from "@/lib/api-fields";
 import { downloadRemoteImage, deletePhoto, savePhotoBytes } from "@/lib/photos";
+import { ensureRoaster } from "@/lib/roasters";
 
 export const dynamic = "force-dynamic";
 
@@ -48,11 +49,13 @@ export async function POST(request: Request) {
   const { photoFile, error: photoError } = await attachPhotoFromUrl(null, body.photoUrl);
   if (photoError) return json({ error: photoError }, 422);
 
+  const { id: roasterId } = await ensureRoaster(values.roaster!);
   const now = new Date();
   const [row] = await db
     .insert(coffees)
     .values({
       roaster: values.roaster!,
+      roasterId,
       name: values.name!,
       ...values,
       origin: joinOrigin(values.country ?? null, values.region ?? null),

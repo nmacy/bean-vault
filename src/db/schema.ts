@@ -1,8 +1,30 @@
 import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
 
+export const roasters = sqliteTable("roasters", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull().unique(),
+  website: text("website"),
+  state: text("state"), // state/province they operate out of
+  country: text("country"),
+  description: text("description"), // short blurb
+  specialty: text("specialty"), // e.g. "single-origin light roasts"
+  foundedYear: integer("founded_year"),
+  logoFile: text("logo_file"), // filename inside data/uploads
+  aiEnriched: integer("ai_enriched", { mode: "boolean" }).notNull().default(false),
+  sourceUrl: text("source_url"), // last URL used for AI enrichment
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+export type Roaster = typeof roasters.$inferSelect;
+export type NewRoaster = typeof roasters.$inferInsert;
+
 export const coffees = sqliteTable("coffees", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   roaster: text("roaster").notNull(),
+  // Denormalized, best-effort join key kept in sync by ensureRoaster(); never
+  // a hard constraint — coffees.roaster (free text) stays authoritative.
+  roasterId: integer("roaster_id").references(() => roasters.id),
   name: text("name").notNull(),
   origin: text("origin"), // legacy combined value, kept for back-compat
   country: text("country"),

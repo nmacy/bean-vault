@@ -27,6 +27,15 @@ export type AiCoffeeFields = {
   description: string | null;
 };
 
+/** Roaster-level facts opportunistically pulled off a product page, if present. */
+export type AiRoasterFields = {
+  state: string | null;
+  country: string | null;
+  description: string | null;
+  foundedYear: number | null;
+  specialty: string | null;
+};
+
 function decodeEntities(v: string): string {
   return v.replace(/&(?:#0?39;|quot;|amp;|lt;|gt;|nbsp;|rsquo;|ldquo;|rdquo;)/g, (m) =>
     ({ "&#39;": "'", "&#039;": "'", "&quot;": '"', "&amp;": "&", "&lt;": "<", "&gt;": ">", "&nbsp;": " ", "&rsquo;": "’", "&ldquo;": "“", "&rdquo;": "”" })[m] ?? m,
@@ -170,10 +179,67 @@ function findTastingNotes(text: string): string | null {
   return s.length >= 12 ? s : null;
 }
 
-/** Page metadata for feed-less stores: og:title (or <title>) and og:image. */
+/**
+ * Many storefront CDNs (Shopify's in particular) resize an image on the fly
+ * via width/height query params \u2014 a favicon <link> often points at a tiny
+ * 32x32 crop of an otherwise crisp, much larger master image. Stripping
+ * those params serves the original file instead.
+ */
+function fullResolutionIcon(url: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete("width");
+    u.searchParams.delete("height");
+    u.searchParams.delete("crop");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+/** Every <link rel="\u2026icon\u2026"> tag on the page, resolved to absolute, full-resolution URLs. */
+function extractIconLinks(html: string, baseUrl: string): { href: string; isAppleTouch: boolean; area: number }[] {
+  const icons: { href: string; isAppleTouch: boolean; area: number }[] = [];
+  for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
+    const tag = m[0];
+    const rel = tag.match(/\brel=["']([^"']+)["']/i)?.[1]?.toLowerCase();
+    const href = tag.match(/\bhref=["']([^"']+)["']/i)?.[1];
+    if (!rel || !href) continue;
+    const tokens = rel.split(/\s+/);
+    if (!tokens.some((t) => t.includes("icon"))) continue;
+    const sizes = tag.match(/\bsizes=["']([^"']+)["']/i)?.[1]?.match(/(\d+)x(\d+)/i);
+    const area = sizes ? Number(sizes[1]) * Number(sizes[2]) : 0;
+    try {
+      icons.push({
+        href: fullResolutionIcon(new URL(href, baseUrl).toString()),
+        isAppleTouch: tokens.some((t) => t.startsWith("apple-touch-icon")),
+        area,
+      });
+    } catch {
+      /* malformed href, skip */
+    }
+  }
+  return icons;
+}
+
+/**
+ * Every icon candidate on the page, best quality first: apple-touch-icon
+ * (usually a clean square logo mark, unlike a tiny favicon.ico) before plain
+ * favicons, largest declared `sizes` first within each group. Ranked (rather
+ * than a single pick) so a broken/404 link \u2014 theme cruft is common \u2014 can be
+ * skipped in favor of the next-best candidate instead of losing the logo.
+ */
+function rankIcons(icons: { href: string; isAppleTouch: boolean; area: number }[]): string[] {
+  const sorted = [...icons].sort((a, b) =>
+    a.isAppleTouch !== b.isAppleTouch ? (a.isAppleTouch ? -1 : 1) : b.area - a.area,
+  );
+  return [...new Set(sorted.map((i) => i.href))];
+}
+
+/** Page metadata for feed-less stores: og:title (or <title>), og:image, and ranked icon candidates. */
 export async function fetchPageMeta(
   url: string,
-): Promise<{ title: string | null; image: string | null }> {
+): Promise<{ title: string | null; image: string | null; icon: string | null; icons: string[] }> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), PAGE_FETCH_TIMEOUT_MS);
   try {
@@ -181,7 +247,7 @@ export async function fetchPageMeta(
       headers: { "User-Agent": "coffee-tracker/0.1 (personal coffee log)" },
       signal: ctrl.signal,
     });
-    if (!res.ok) return { title: null, image: null };
+    if (!res.ok) return { title: null, image: null, icon: null, icons: [] };
     const html = await res.text();
     const meta = (name: string) => {
       const m = html.match(
@@ -196,9 +262,10 @@ export async function fetchPageMeta(
       title = parts[0].trim();
       if (!title) title = null;
     }
-    return { title, image: meta("og:image") };
+    const icons = rankIcons(extractIconLinks(html, url));
+    return { title, image: meta("og:image"), icon: icons[0] ?? null, icons };
   } catch {
-    return { title: null, image: null };
+    return { title: null, image: null, icon: null, icons: [] };
   } finally {
     clearTimeout(timer);
   }
@@ -290,6 +357,19 @@ function parseFields(data: unknown): AiCoffeeFields {
   };
 }
 
+function parseRoasterFields(data: unknown): AiRoasterFields {
+  const rec = typeof data === "object" && data !== null ? (data as Record<string, unknown>) : {};
+  const yearRaw = cleanString(rec.roasterFoundedYear);
+  const year = yearRaw ? Number(yearRaw.replace(/[^\d]/g, "")) : null;
+  return {
+    state: cleanString(rec.roasterState),
+    country: cleanString(rec.roasterCountry),
+    description: cleanString(rec.roasterDescription),
+    foundedYear: year !== null && Number.isFinite(year) && year >= 1600 && year <= 2100 ? year : null,
+    specialty: cleanString(rec.roasterSpecialty),
+  };
+}
+
 /** Public model catalog from OpenRouter (id list for the model picker). */
 export async function openRouterModels(): Promise<string[]> {
   const ctrl = new AbortController();
@@ -314,7 +394,7 @@ export async function openRouterModels(): Promise<string[]> {
 }
 
 export type EnrichResult =
-  | { ok: true; fields: AiCoffeeFields }
+  | { ok: true; fields: AiCoffeeFields; roaster: AiRoasterFields }
   | { ok: false; message: string };
 
 /** A chat-completion call to OpenRouter, returning the assistant's raw text content. */
@@ -415,7 +495,13 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
         "mix (blend or single-origin), decaffeinated (boolean), tastingNotes " +
         "(flavor notes: one short sentence describing the taste, e.g. \"sweet citrus, " +
         "jasmine and a syrupy body\"; null when the page has none), description. " +
-        "Use null when the page does not say. If the page " +
+        "Also, if the page (e.g. a footer, about section, or brand story) says " +
+        "anything about the ROASTER itself (the company, not this specific bag), " +
+        "include: roasterState (state/province they operate out of), " +
+        "roasterCountry, roasterDescription (a short blurb about the roaster), " +
+        "roasterFoundedYear (a 4-digit year), roasterSpecialty (a short phrase " +
+        "on what they focus on, e.g. \"single-origin light roasts\"). " +
+        "Use null for anything the page does not say — do not guess. If the page " +
         "mentions bag size options, ignore them.",
     },
     { role: "user", content: `Store page URL: ${url}\n\nPage text:\n${text}` },
@@ -424,6 +510,7 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
 
   const result = parseFieldsReply(reply.content, parseFields);
   if (!result.ok) return result;
+  const roasterResult = parseFieldsReply(reply.content, parseRoasterFields);
 
   const fields = result.fields;
   // Deterministic fallbacks straight from the page text.
@@ -433,7 +520,13 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
     const agtron = findAgtron(text);
     if (agtron !== null) fields.roastLevel = agtronToRoast(agtron);
   }
-  return { ok: true, fields };
+  return {
+    ok: true,
+    fields,
+    roaster: roasterResult.ok
+      ? roasterResult.fields
+      : { state: null, country: null, description: null, foundedYear: null, specialty: null },
+  };
 }
 
 /** Coffee facts read straight off a bag's label in a photo — plus a roaster/name guess. */
@@ -492,6 +585,42 @@ export async function analyzeCoffeePhoto(
   if (!reply.ok) return reply;
 
   return parseFieldsReply(reply.content, parsePhotoFields);
+}
+
+export type RoasterEnrichResult =
+  | { ok: true; fields: AiRoasterFields & { logoCandidates: string[] } }
+  | { ok: false; message: string };
+
+/** Read a roaster's own homepage/about page and extract profile facts. */
+export async function enrichRoasterPage(url: string, apiKey: string, modelOverride?: string): Promise<RoasterEnrichResult> {
+  if (!apiKey) {
+    return { ok: false, message: "OpenRouter API key is not configured." };
+  }
+  const model = modelOverride || DEFAULT_MODEL;
+
+  const [text, meta] = await Promise.all([fetchPageText(url), fetchPageMeta(url)]);
+  if (!text) return { ok: false, message: "Could not read that page." };
+
+  const reply = await callOpenRouterChat(apiKey, model, [
+    {
+      role: "system",
+      content:
+        "You extract facts about a COFFEE ROASTER company from its own website " +
+        "page. Return ONLY a JSON object with these keys: roasterState " +
+        "(state/province they operate out of), roasterCountry, " +
+        "roasterDescription (a short blurb about who they are), " +
+        "roasterFoundedYear (a 4-digit year), roasterSpecialty (a short phrase " +
+        "on what they focus on, e.g. \"single-origin light roasts\"). Use null " +
+        "for anything the page does not say — do not guess.",
+    },
+    { role: "user", content: `Roaster page URL: ${url}\n\nPage text:\n${text}` },
+  ]);
+  if (!reply.ok) return reply;
+
+  const result = parseFieldsReply(reply.content, parseRoasterFields);
+  if (!result.ok) return result;
+  const logoCandidates = [...meta.icons, meta.image].filter((u): u is string => u !== null);
+  return { ok: true, fields: { ...result.fields, logoCandidates } };
 }
 
 /** Merge photo- and product-page-derived fields, preferring the (usually fuller) page facts. */

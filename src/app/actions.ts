@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { coffees, settings } from "@/db/schema";
-import { deletePhoto, downloadRemoteImage, savePhoto, savePhotoBytes } from "@/lib/photos";
+import { coffees, roasters, settings } from "@/db/schema";
+import { deletePhoto, downloadFirstWorkingImage, downloadRemoteImage, savePhoto, savePhotoBytes } from "@/lib/photos";
 import { dateField, dollarsToCents, elevationField, intField, photoFile as readPhoto, requiredText, text } from "@/lib/validation";
 import { parseBeanconqueror } from "@/lib/beanconqueror";
 import { bestMatch, lookupProductPage, storeFor, storeProducts, type StoreProductDetail } from "@/lib/storefinder";
@@ -14,13 +14,16 @@ import {
   analyzeCoffeePhoto,
   DEFAULT_MODEL,
   enrichCoffeePage,
+  enrichRoasterPage,
   fetchPageMeta,
   mergePhotoAndPageFields,
   type AiCoffeeFields,
+  type AiRoasterFields,
   type PhotoFields,
 } from "@/lib/ai";
 import { addApiKey as storeApiKey, revokeApiKey as dropApiKey } from "@/lib/api-auth";
 import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
+import { countRoasterCoffees, ensureRoaster, ensureRoasters, pruneRoasterIfEmpty, renameRoasterCoffees } from "@/lib/roasters";
 import { canTransition, deriveStatus, toBeanStatus, todayStr, type BeanStatus } from "@/lib/status";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -78,6 +81,7 @@ function splitOrigin(origin: string | null): { country: string | null; region: s
 export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
   let saved = 0;
   let skipped = 0;
+  const roasterIds = await ensureRoasters(rows.map((r) => r.roaster));
   db.transaction((tx) => {
     for (const row of rows) {
       const roaster = row.roaster.trim();
@@ -90,6 +94,7 @@ export async function saveGrid(rows: GridRow[]): Promise<SaveGridResult> {
         .update(coffees)
         .set({
           roaster,
+          roasterId: roasterIds.get(roaster.toLowerCase()) ?? null,
           name,
           country: row.country,
           region: row.region,
@@ -147,10 +152,12 @@ export async function importBeanconqueror(_prev: ImportState, formData: FormData
   }
 
   const now = new Date();
+  const roasterIds = await ensureRoasters(parsed.beans.map((b) => b.roaster));
   let imported = 0;
   for (let i = 0; i < parsed.beans.length; i += 100) {
     const batch = parsed.beans.slice(i, i + 100).map((bean) => ({
       ...bean,
+      roasterId: roasterIds.get(bean.roaster.trim().toLowerCase()) ?? null,
       createdAt: now,
       updatedAt: now,
     }));
@@ -224,11 +231,13 @@ export async function createCoffee(_prev: FormState, formData: FormData): Promis
   const file = readPhoto(formData);
   if (file) photo = await savePhoto(file);
 
+  const { id: roasterId } = await ensureRoaster(input.roaster);
   const now = new Date();
   const [row] = await db
     .insert(coffees)
     .values({
       roaster: input.roaster,
+      roasterId,
       name: input.name,
       country: input.country,
       region: input.region,
@@ -308,10 +317,12 @@ export async function updateCoffee(id: number, _prev: FormState, formData: FormD
     photo = await savePhoto(file);
   }
 
+  const { id: roasterId } = await ensureRoaster(input.roaster);
   await db
     .update(coffees)
     .set({
       roaster: input.roaster,
+      roasterId,
       name: input.name,
       ...fields(input),
       origin: joinOrigin(input.country, input.region),
@@ -320,7 +331,11 @@ export async function updateCoffee(id: number, _prev: FormState, formData: FormD
     })
     .where(eq(coffees.id, id));
 
-  revalidatePath("/"); revalidatePath("/coffees");
+  if (input.roaster.trim().toLowerCase() !== existing.roaster.trim().toLowerCase()) {
+    await pruneRoasterIfEmpty(existing.roaster);
+  }
+
+  revalidatePath("/"); revalidatePath("/coffees"); revalidatePath("/roasters");
   revalidatePath(`/coffees/${id}`);
   revalidatePath(`/coffees/${id}/edit`);
   redirect(`/coffees/${id}`);
@@ -331,7 +346,8 @@ export async function deleteCoffee(id: number): Promise<void> {
   if (!existing) return;
   await db.delete(coffees).where(eq(coffees.id, id));
   await deletePhoto(existing.photoFile);
-  revalidatePath("/"); revalidatePath("/coffees");
+  await pruneRoasterIfEmpty(existing.roaster);
+  revalidatePath("/"); revalidatePath("/coffees"); revalidatePath("/roasters");
   redirect("/coffees");
 }
 
@@ -503,11 +519,14 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
     }
   }
 
+  const { id: roasterId, created: roasterCreated } = await ensureRoaster(roaster);
+
   const now = new Date();
   const [row] = await db
     .insert(coffees)
     .values({
       roaster,
+      roasterId,
       name,
       country,
       region,
@@ -530,8 +549,54 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
     })
     .returning();
 
-  revalidatePath("/"); revalidatePath("/coffees");
-  revalidatePath("/coffees");
+  // Fill the newly-created roaster's profile from the same page the AI just
+  // read, when the link-import flow ran AI and had something to say — plus a
+  // logo, which needs no AI key at all (the site's own icon/apple-touch-icon
+  // is scraped straight off the page, a better "roaster logo" guess than the
+  // product photo). Never touches a roaster that already existed.
+  if (roasterCreated) {
+    const roasterState = text(formData, "roasterState");
+    const roasterCountry = text(formData, "roasterCountry");
+    const roasterDescription = text(formData, "roasterDescription");
+    const roasterFoundedYear = intField(formData, "roasterFoundedYear", 1600, 2100);
+    const roasterSpecialty = text(formData, "roasterSpecialty");
+    const hasAiFields = Boolean(
+      roasterState || roasterCountry || roasterDescription || roasterFoundedYear || roasterSpecialty,
+    );
+
+    const roasterMeta = await fetchPageMeta(url);
+    const roasterLogoCandidates = [...roasterMeta.icons, roasterMeta.image].filter(
+      (u): u is string => u !== null,
+    );
+    let roasterLogoFile: string | null = null;
+    if (roasterLogoCandidates.length > 0) {
+      const image = await downloadFirstWorkingImage(roasterLogoCandidates);
+      if (image) {
+        try {
+          roasterLogoFile = await savePhotoBytes(image.data, image.ext);
+        } catch {
+          roasterLogoFile = null;
+        }
+      }
+    }
+
+    if (hasAiFields || roasterLogoFile) {
+      const roasterChanges: Partial<typeof roasters.$inferInsert> = { updatedAt: new Date() };
+      if (roasterState) roasterChanges.state = roasterState;
+      if (roasterCountry) roasterChanges.country = roasterCountry;
+      if (roasterDescription) roasterChanges.description = roasterDescription;
+      if (roasterFoundedYear) roasterChanges.foundedYear = roasterFoundedYear;
+      if (roasterSpecialty) roasterChanges.specialty = roasterSpecialty;
+      if (roasterLogoFile) roasterChanges.logoFile = roasterLogoFile;
+      if (hasAiFields) {
+        roasterChanges.aiEnriched = true;
+        roasterChanges.sourceUrl = url;
+      }
+      await db.update(roasters).set(roasterChanges).where(eq(roasters.id, roasterId));
+    }
+  }
+
+  revalidatePath("/"); revalidatePath("/coffees"); revalidatePath("/roasters");
   redirect(`/coffees/${row.id}`);
 }
 
@@ -613,6 +678,12 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
   let photos = 0;
   let skipped = 0;
 
+  const roasterIds = await ensureRoasters(
+    rec.coffees
+      .map((entry) => (typeof entry === "object" && entry !== null ? backupStr((entry as BackupCoffee).roaster) : null))
+      .filter((r): r is string => r !== null),
+  );
+
   for (const entry of rec.coffees) {
     if (typeof entry !== "object" || entry === null) {
       skipped += 1;
@@ -626,6 +697,7 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
       skipped += 1;
       continue;
     }
+    const roasterId = roasterIds.get(roaster.trim().toLowerCase()) ?? null;
 
     // Write the embedded photo first (idempotent: same bytes, same name).
     let photoFile = backupStr(c.photoFile);
@@ -657,6 +729,7 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
     const backupRegion = backupStr(c.region) ?? splitOrigin(backupStr(c.origin)).region;
     const values = {
       roaster,
+      roasterId,
       name,
       country: backupCountry,
       region: backupRegion,
@@ -777,6 +850,8 @@ export async function importBeanVaultCsv(_prev: ImportState, formData: FormData)
   let skipped = 0;
   let photosMissing = 0;
 
+  const roasterIds = await ensureRoasters(rows.slice(1).map((row) => csvCell(row, col.roaster)));
+
   for (const row of rows.slice(1)) {
     const roaster = csvCell(row, col.roaster);
     const name = csvCell(row, col.name);
@@ -784,6 +859,7 @@ export async function importBeanVaultCsv(_prev: ImportState, formData: FormData)
       skipped += 1;
       continue;
     }
+    const roasterId = roasterIds.get(roaster.trim().toLowerCase()) ?? null;
 
     const rawId = csvNum(csvCell(row, col.id));
     const existingId =
@@ -815,6 +891,7 @@ export async function importBeanVaultCsv(_prev: ImportState, formData: FormData)
 
     const values = {
       roaster,
+      roasterId,
       name,
       country,
       region,
@@ -895,7 +972,7 @@ async function aiPageProduct(url: string): Promise<StoreProductDetail | null> {
 }
 
 export type AiEnrichResult =
-  | { ok: true; fields: AiCoffeeFields }
+  | { ok: true; fields: AiCoffeeFields; roaster: AiRoasterFields }
   | { ok: false; message: string };
 
 const SETTINGS_KEY = "openrouter_api_key";
@@ -1122,4 +1199,162 @@ export async function revokeApiKey(_prev: ApiKeyState, formData: FormData): Prom
   await dropApiKey(id);
   revalidatePath("/settings");
   return { ok: true, message: "API key revoked." };
+}
+
+/* ---------- roasters ---------- */
+
+export type RoasterFormState = { message?: string };
+
+function collectRoaster(form: FormData) {
+  return {
+    name: requiredText(form, "roasterName"),
+    website: text(form, "roasterWebsite"),
+    state: text(form, "roasterState"),
+    country: text(form, "roasterCountry"),
+    specialty: text(form, "roasterSpecialty"),
+    foundedYear: intField(form, "roasterFoundedYear", 1600, 2100),
+    description: text(form, "roasterDescription"),
+  };
+}
+
+export async function updateRoaster(id: number, _prev: RoasterFormState, formData: FormData): Promise<RoasterFormState> {
+  const [existing] = await db.select().from(roasters).where(eq(roasters.id, id));
+  if (!existing) return { message: "Roaster not found." };
+
+  const input = collectRoaster(formData);
+  if (!input.name) return { message: "Name is required." };
+
+  let logo = existing.logoFile;
+  const removeLogo = formData.get("removePhoto") === "on";
+  const file = readPhoto(formData);
+  if (removeLogo && !file) {
+    await deletePhoto(existing.logoFile);
+    logo = null;
+  } else if (file) {
+    await deletePhoto(existing.logoFile);
+    logo = await savePhoto(file);
+  }
+
+  await db
+    .update(roasters)
+    .set({
+      name: input.name,
+      website: input.website,
+      state: input.state,
+      country: input.country,
+      specialty: input.specialty,
+      foundedYear: input.foundedYear,
+      description: input.description,
+      logoFile: logo,
+      updatedAt: new Date(),
+    })
+    .where(eq(roasters.id, id));
+
+  if (input.name.trim().toLowerCase() !== existing.name.trim().toLowerCase()) {
+    await renameRoasterCoffees(id, existing.name, input.name);
+  }
+
+  revalidatePath("/"); revalidatePath("/coffees"); revalidatePath("/roasters");
+  revalidatePath(`/roasters/${id}`);
+  revalidatePath(`/roasters/${id}/edit`);
+  redirect(`/roasters/${id}`);
+}
+
+/** No-op (rather than an error) if bags still reference this roaster — the UI disables the button in that case. */
+export async function deleteRoaster(id: number): Promise<void> {
+  const [existing] = await db.select().from(roasters).where(eq(roasters.id, id));
+  if (!existing) return;
+  const count = await countRoasterCoffees(id, existing.name);
+  if (count > 0) return;
+  await db.delete(roasters).where(eq(roasters.id, id));
+  await deletePhoto(existing.logoFile);
+  revalidatePath("/roasters");
+  redirect("/roasters");
+}
+
+/* ---------- update existing roaster from a link ---------- */
+
+export type RoasterLinkUpdateState = { message?: string; applied?: string[]; ok?: boolean };
+
+/**
+ * Re-read a roaster's own page (homepage/about, not a product page) and merge
+ * AI-extracted profile facts into an existing roaster. Only fills fields the
+ * page actually provides, and never replaces an existing logo.
+ */
+export async function updateRoasterFromLink(_prev: RoasterLinkUpdateState, formData: FormData): Promise<RoasterLinkUpdateState> {
+  const id = intField(formData, "id", 1, 1_000_000_000);
+  const url = text(formData, "url");
+  if (id === null) return { message: "Missing roaster id." };
+  if (!url) return { message: "Paste a link first." };
+
+  const [roaster] = await db.select().from(roasters).where(eq(roasters.id, id));
+  if (!roaster) return { message: "Roaster not found." };
+
+  const enriched = await enrichRoasterPage(url, await resolveAiKey(), await resolveAiModel());
+  if (!enriched.ok) return { ok: false, message: enriched.message };
+  const f = enriched.fields;
+
+  const applied: string[] = [];
+  const changes: Partial<typeof roasters.$inferInsert> = { updatedAt: new Date() };
+
+  if (f.state && f.state !== roaster.state) {
+    changes.state = f.state;
+    applied.push("State");
+  }
+  if (f.country && f.country !== roaster.country) {
+    changes.country = f.country;
+    applied.push("Country");
+  }
+  if (f.description && f.description !== roaster.description) {
+    changes.description = f.description;
+    applied.push("Description");
+  }
+  if (f.foundedYear && f.foundedYear !== roaster.foundedYear) {
+    changes.foundedYear = f.foundedYear;
+    applied.push("Founded");
+  }
+  if (f.specialty && f.specialty !== roaster.specialty) {
+    changes.specialty = f.specialty;
+    applied.push("Specialty");
+  }
+
+  if (!roaster.website) {
+    try {
+      changes.website = new URL(url).origin;
+      applied.push("Website");
+    } catch {
+      /* not a valid absolute URL, skip */
+    }
+  }
+
+  if (!roaster.logoFile && f.logoCandidates.length > 0) {
+    const image = await downloadFirstWorkingImage(f.logoCandidates);
+    if (image) {
+      try {
+        changes.logoFile = await savePhotoBytes(image.data, image.ext);
+        applied.push("Logo");
+      } catch {
+        /* keep existing (none) */
+      }
+    }
+  }
+
+  changes.aiEnriched = true;
+  changes.sourceUrl = url;
+
+  if (applied.length > 0) {
+    await db.update(roasters).set(changes).where(eq(roasters.id, id));
+    revalidatePath("/roasters");
+    revalidatePath(`/roasters/${id}`);
+    revalidatePath(`/roasters/${id}/edit`);
+  }
+
+  return {
+    ok: true,
+    message:
+      applied.length > 0
+        ? `Updated ${applied.length} field${applied.length === 1 ? "" : "s"}.`
+        : "The page had no new details for this roaster.",
+    applied,
+  };
 }

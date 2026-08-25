@@ -70,6 +70,15 @@ export async function downloadRemoteImage(url: string): Promise<{ data: Uint8Arr
   }
 }
 
+/** Try each URL in order, returning the first that downloads successfully — a broken/404 link (theme cruft is common) just falls through to the next candidate. */
+export async function downloadFirstWorkingImage(urls: string[]): Promise<{ data: Uint8Array; ext: string } | null> {
+  for (const url of urls) {
+    const image = await downloadRemoteImage(url);
+    if (image) return image;
+  }
+  return null;
+}
+
 export async function deletePhoto(name: string | null): Promise<void> {
   if (!name) return;
   if (!isValidPhotoName(name)) return;
