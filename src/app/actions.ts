@@ -23,7 +23,7 @@ import {
 } from "@/lib/ai";
 import { addApiKey as storeApiKey, revokeApiKey as dropApiKey } from "@/lib/api-auth";
 import { isValidPhotoName, UPLOAD_DIR } from "@/lib/photos";
-import { countRoasterCoffees, ensureRoaster, ensureRoasters, pruneRoasterIfEmpty, renameRoasterCoffees } from "@/lib/roasters";
+import { countRoasterCoffees, ensureRoaster, ensureRoasters, findRoasterByName, pruneRoasterIfEmpty, renameRoasterCoffees } from "@/lib/roasters";
 import { canTransition, deriveStatus, toBeanStatus, todayStr, type BeanStatus } from "@/lib/status";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -36,6 +36,7 @@ export type ImportState = {
   total?: number;
   photosSkipped?: number;
   skipped?: number;
+  roastersRestored?: number;
 };
 
 export type GridRow = {
@@ -605,6 +606,22 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
 const MAX_BACKUP_BYTES = 300 * 1024 * 1024;
 const ALLOWED_PHOTO_EXTS = new Set(["jpg", "jpeg", "png", "webp", "gif", "avif"]);
 
+type BackupRoaster = {
+  name?: unknown;
+  website?: unknown;
+  state?: unknown;
+  country?: unknown;
+  description?: unknown;
+  specialty?: unknown;
+  foundedYear?: unknown;
+  aiEnriched?: unknown;
+  sourceUrl?: unknown;
+  logoFile?: unknown;
+  logo?: { data?: unknown } | null;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
 type BackupCoffee = {
   id?: unknown;
   roaster?: unknown;
@@ -648,9 +665,11 @@ function backupDate(v: unknown): Date | null {
 }
 
 /**
- * Restore a Bean Vault JSON backup. Rows are upserted by id, so re-importing
- * the same backup is idempotent; rows not in the backup are left untouched.
- * Photos embedded in the backup are written back alongside their records.
+ * Restore a Bean Vault JSON backup. Coffees are upserted by id, roasters by
+ * name (matching how roasters are found-or-created everywhere else in the
+ * app) — so re-importing the same backup is idempotent, and rows/roasters
+ * not in the backup are left untouched. Photos and logos embedded in the
+ * backup are written back alongside their records.
  */
 export async function importBackup(_prev: ImportState, formData: FormData): Promise<ImportState> {
   const file = formData.get("file");
@@ -677,6 +696,61 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
   let updated = 0;
   let photos = 0;
   let skipped = 0;
+  let roastersRestored = 0;
+
+  if (Array.isArray(rec.roasters)) {
+    for (const entry of rec.roasters) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const r = entry as BackupRoaster;
+      const name = backupStr(r.name);
+      if (!name) continue;
+
+      let logoFile = backupStr(r.logoFile);
+      if (r.logo && typeof r.logo.data === "string" && logoFile) {
+        const ext = logoFile.split(".").pop()?.toLowerCase() ?? "";
+        if (ALLOWED_PHOTO_EXTS.has(ext) && r.logo.data.length > 0) {
+          try {
+            const raw = Buffer.from(r.logo.data, "base64");
+            logoFile = raw.length > 0 && raw.length <= 12 * 1024 * 1024
+              ? await savePhotoBytes(raw, ext === "jpeg" ? "jpg" : ext)
+              : null;
+          } catch {
+            logoFile = null;
+          }
+        } else {
+          logoFile = null;
+        }
+      }
+
+      const values = {
+        website: backupStr(r.website),
+        state: backupStr(r.state),
+        country: backupStr(r.country),
+        description: backupStr(r.description),
+        specialty: backupStr(r.specialty),
+        foundedYear: backupNum(r.foundedYear, 1600, 2100),
+        aiEnriched: r.aiEnriched === true,
+        sourceUrl: backupStr(r.sourceUrl),
+      };
+
+      const existing = await findRoasterByName(name);
+      if (existing) {
+        await db
+          .update(roasters)
+          .set({ ...values, logoFile: logoFile ?? existing.logoFile, updatedAt: new Date() })
+          .where(eq(roasters.id, existing.id));
+      } else {
+        await db.insert(roasters).values({
+          name,
+          ...values,
+          logoFile,
+          createdAt: backupDate(r.createdAt) ?? new Date(),
+          updatedAt: backupDate(r.updatedAt) ?? new Date(),
+        });
+      }
+      roastersRestored += 1;
+    }
+  }
 
   const roasterIds = await ensureRoasters(
     rec.coffees
@@ -772,7 +846,7 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
     }
   }
 
-  revalidatePath("/"); revalidatePath("/coffees");
+  revalidatePath("/"); revalidatePath("/coffees"); revalidatePath("/roasters");
   revalidatePath("/coffees");
   revalidatePath("/dashboard");
   return {
@@ -781,6 +855,7 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
     total: created + updated,
     photosSkipped: photos,
     skipped,
+    roastersRestored,
   };
 }
 

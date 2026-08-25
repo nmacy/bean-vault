@@ -181,11 +181,11 @@ function findTastingNotes(text: string): string | null {
 
 /**
  * Many storefront CDNs (Shopify's in particular) resize an image on the fly
- * via width/height query params \u2014 a favicon <link> often points at a tiny
- * 32x32 crop of an otherwise crisp, much larger master image. Stripping
- * those params serves the original file instead.
+ * via width/height query params \u2014 a favicon link or header logo <img> often
+ * points at a tiny crop of an otherwise crisp, much larger master image.
+ * Stripping those params serves the original file instead.
  */
-function fullResolutionIcon(url: string): string {
+function stripResizeParams(url: string): string {
   try {
     const u = new URL(url);
     u.searchParams.delete("width");
@@ -195,6 +195,56 @@ function fullResolutionIcon(url: string): string {
   } catch {
     return url;
   }
+}
+
+/**
+ * A site's `Organization` JSON-LD `logo` field, when present \u2014 a purpose-declared
+ * brand mark, usually full quality (many SEO/e-commerce setups include this
+ * regardless of what the favicon looks like).
+ */
+function extractOrganizationLogo(html: string, baseUrl: string): string | null {
+  for (const m of html.matchAll(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
+    let data: unknown;
+    try {
+      data = JSON.parse(m[1]);
+    } catch {
+      continue;
+    }
+    for (const item of Array.isArray(data) ? data : [data]) {
+      if (typeof item !== "object" || item === null) continue;
+      const rec = item as Record<string, unknown>;
+      const type = rec["@type"];
+      const isOrg = type === "Organization" || (Array.isArray(type) && type.includes("Organization"));
+      if (!isOrg) continue;
+      const logo = rec.logo;
+      const href = typeof logo === "string" ? logo : typeof logo === "object" && logo !== null ? (logo as Record<string, unknown>).url : null;
+      if (typeof href !== "string") continue;
+      try {
+        return stripResizeParams(new URL(href, baseUrl).toString());
+      } catch {
+        continue;
+      }
+    }
+  }
+  return null;
+}
+
+/** The first <img> whose class or alt marks it as the site's own logo (header brand mark, not a favicon). */
+function extractHeaderLogoImg(html: string, baseUrl: string): string | null {
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+    const tag = m[0];
+    const cls = tag.match(/\bclass=["']([^"']+)["']/i)?.[1]?.toLowerCase() ?? "";
+    const alt = tag.match(/\balt=["']([^"']*)["']/i)?.[1]?.toLowerCase() ?? "";
+    if (!cls.includes("logo") && !alt.includes("logo")) continue;
+    const src = tag.match(/\bsrc=["']([^"']+)["']/i)?.[1]?.replace(/&amp;/g, "&");
+    if (!src) continue;
+    try {
+      return stripResizeParams(new URL(src, baseUrl).toString());
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 /** Every <link rel="\u2026icon\u2026"> tag on the page, resolved to absolute, full-resolution URLs. */
@@ -211,7 +261,7 @@ function extractIconLinks(html: string, baseUrl: string): { href: string; isAppl
     const area = sizes ? Number(sizes[1]) * Number(sizes[2]) : 0;
     try {
       icons.push({
-        href: fullResolutionIcon(new URL(href, baseUrl).toString()),
+        href: stripResizeParams(new URL(href, baseUrl).toString()),
         isAppleTouch: tokens.some((t) => t.startsWith("apple-touch-icon")),
         area,
       });
@@ -223,17 +273,32 @@ function extractIconLinks(html: string, baseUrl: string): { href: string; isAppl
 }
 
 /**
- * Every icon candidate on the page, best quality first: apple-touch-icon
- * (usually a clean square logo mark, unlike a tiny favicon.ico) before plain
- * favicons, largest declared `sizes` first within each group. Ranked (rather
- * than a single pick) so a broken/404 link \u2014 theme cruft is common \u2014 can be
- * skipped in favor of the next-best candidate instead of losing the logo.
+ * Every icon <link> candidate, best quality first: apple-touch-icon (usually
+ * a clean square logo mark, unlike a tiny favicon.ico) before plain
+ * favicons, largest declared `sizes` first within each group.
  */
-function rankIcons(icons: { href: string; isAppleTouch: boolean; area: number }[]): string[] {
+function rankIconLinks(icons: { href: string; isAppleTouch: boolean; area: number }[]): string[] {
   const sorted = [...icons].sort((a, b) =>
     a.isAppleTouch !== b.isAppleTouch ? (a.isAppleTouch ? -1 : 1) : b.area - a.area,
   );
   return [...new Set(sorted.map((i) => i.href))];
+}
+
+/**
+ * Every logo candidate on the page, best quality first: a declared
+ * Organization logo and the header's own logo <img> (real brand marks, often
+ * much better than a favicon) before the ranked <link rel="icon"> list.
+ * Ranked rather than a single pick so a broken/404 link \u2014 theme cruft is
+ * common \u2014 falls through to the next-best candidate instead of losing the
+ * logo entirely.
+ */
+function rankLogoCandidates(html: string, baseUrl: string): string[] {
+  const candidates = [
+    extractOrganizationLogo(html, baseUrl),
+    extractHeaderLogoImg(html, baseUrl),
+    ...rankIconLinks(extractIconLinks(html, baseUrl)),
+  ].filter((u): u is string => u !== null);
+  return [...new Set(candidates)];
 }
 
 /** Page metadata for feed-less stores: og:title (or <title>), og:image, and ranked icon candidates. */
@@ -262,7 +327,7 @@ export async function fetchPageMeta(
       title = parts[0].trim();
       if (!title) title = null;
     }
-    const icons = rankIcons(extractIconLinks(html, url));
+    const icons = rankLogoCandidates(html, url);
     return { title, image: meta("og:image"), icon: icons[0] ?? null, icons };
   } catch {
     return { title: null, image: null, icon: null, icons: [] };

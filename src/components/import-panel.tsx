@@ -45,8 +45,9 @@ export default function ImportPanel() {
           <div className="field">
             <span className="hint">
               Upload a <code>bean-vault-backup.json</code> from the Export card above. Coffees are
-              updated or recreated by their id — importing the same backup twice leaves everything
-              unchanged, and coffees not in the backup are kept.
+              updated or recreated by their id, roaster profiles (logo included) by name —
+              importing the same backup twice leaves everything unchanged, and coffees/roasters
+              not in the backup are kept.
             </span>
             <input name="file" type="file" accept=".json,application/json" required />
           </div>
@@ -68,6 +69,9 @@ export default function ImportPanel() {
                   </p>
                   {backupState.photosSkipped ? (
                     <p>{backupState.photosSkipped} photo{backupState.photosSkipped === 1 ? "" : "s"} restored with their coffees.</p>
+                  ) : null}
+                  {backupState.roastersRestored ? (
+                    <p>{backupState.roastersRestored} roaster{backupState.roastersRestored === 1 ? "" : "s"} restored.</p>
                   ) : null}
                   <Link href="/coffees" className="btn">Browse coffees</Link>
                 </div>

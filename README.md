@@ -241,9 +241,10 @@ tracks roaster profiles, not store feeds.
 Beyond copying the volume, the app itself can get your data out and back in
 (**Settings → Data / Import**):
 
-- **Backup (JSON)** — `GET /api/export/json`. Every coffee plus its photo
-  embedded as base64. Restoring the same file is idempotent (rows upsert by
-  id; rows missing from the backup are left untouched).
+- **Backup (JSON)** — `GET /api/export/json`. Every coffee plus its photo,
+  and every roaster's profile plus its logo, all embedded as base64.
+  Restoring the same file is idempotent — coffees upsert by id, roasters by
+  name; anything missing from the backup is left untouched.
 - **CSV** — `GET /api/export`. The plain table for spreadsheets. The CSV
   import honors an `id` column to update existing rows; photo names are only
   restored when the file is already present in `data/uploads/`.
