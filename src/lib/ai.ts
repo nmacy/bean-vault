@@ -27,6 +27,15 @@ export type AiCoffeeFields = {
   description: string | null;
 };
 
+/** Roaster-level facts opportunistically pulled off a product page, if present. */
+export type AiRoasterFields = {
+  state: string | null;
+  country: string | null;
+  description: string | null;
+  foundedYear: number | null;
+  specialty: string | null;
+};
+
 function decodeEntities(v: string): string {
   return v.replace(/&(?:#0?39;|quot;|amp;|lt;|gt;|nbsp;|rsquo;|ldquo;|rdquo;)/g, (m) =>
     ({ "&#39;": "'", "&#039;": "'", "&quot;": '"', "&amp;": "&", "&lt;": "<", "&gt;": ">", "&nbsp;": " ", "&rsquo;": "’", "&ldquo;": "“", "&rdquo;": "”" })[m] ?? m,
@@ -290,6 +299,19 @@ function parseFields(data: unknown): AiCoffeeFields {
   };
 }
 
+function parseRoasterFields(data: unknown): AiRoasterFields {
+  const rec = typeof data === "object" && data !== null ? (data as Record<string, unknown>) : {};
+  const yearRaw = cleanString(rec.roasterFoundedYear);
+  const year = yearRaw ? Number(yearRaw.replace(/[^\d]/g, "")) : null;
+  return {
+    state: cleanString(rec.roasterState),
+    country: cleanString(rec.roasterCountry),
+    description: cleanString(rec.roasterDescription),
+    foundedYear: year !== null && Number.isFinite(year) && year >= 1600 && year <= 2100 ? year : null,
+    specialty: cleanString(rec.roasterSpecialty),
+  };
+}
+
 /** Public model catalog from OpenRouter (id list for the model picker). */
 export async function openRouterModels(): Promise<string[]> {
   const ctrl = new AbortController();
@@ -314,7 +336,7 @@ export async function openRouterModels(): Promise<string[]> {
 }
 
 export type EnrichResult =
-  | { ok: true; fields: AiCoffeeFields }
+  | { ok: true; fields: AiCoffeeFields; roaster: AiRoasterFields }
   | { ok: false; message: string };
 
 /** A chat-completion call to OpenRouter, returning the assistant's raw text content. */
@@ -415,7 +437,13 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
         "mix (blend or single-origin), decaffeinated (boolean), tastingNotes " +
         "(flavor notes: one short sentence describing the taste, e.g. \"sweet citrus, " +
         "jasmine and a syrupy body\"; null when the page has none), description. " +
-        "Use null when the page does not say. If the page " +
+        "Also, if the page (e.g. a footer, about section, or brand story) says " +
+        "anything about the ROASTER itself (the company, not this specific bag), " +
+        "include: roasterState (state/province they operate out of), " +
+        "roasterCountry, roasterDescription (a short blurb about the roaster), " +
+        "roasterFoundedYear (a 4-digit year), roasterSpecialty (a short phrase " +
+        "on what they focus on, e.g. \"single-origin light roasts\"). " +
+        "Use null for anything the page does not say — do not guess. If the page " +
         "mentions bag size options, ignore them.",
     },
     { role: "user", content: `Store page URL: ${url}\n\nPage text:\n${text}` },
@@ -424,6 +452,7 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
 
   const result = parseFieldsReply(reply.content, parseFields);
   if (!result.ok) return result;
+  const roasterResult = parseFieldsReply(reply.content, parseRoasterFields);
 
   const fields = result.fields;
   // Deterministic fallbacks straight from the page text.
@@ -433,7 +462,13 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
     const agtron = findAgtron(text);
     if (agtron !== null) fields.roastLevel = agtronToRoast(agtron);
   }
-  return { ok: true, fields };
+  return {
+    ok: true,
+    fields,
+    roaster: roasterResult.ok
+      ? roasterResult.fields
+      : { state: null, country: null, description: null, foundedYear: null, specialty: null },
+  };
 }
 
 /** Coffee facts read straight off a bag's label in a photo — plus a roaster/name guess. */
@@ -492,6 +527,41 @@ export async function analyzeCoffeePhoto(
   if (!reply.ok) return reply;
 
   return parseFieldsReply(reply.content, parsePhotoFields);
+}
+
+export type RoasterEnrichResult =
+  | { ok: true; fields: AiRoasterFields & { logoUrl: string | null } }
+  | { ok: false; message: string };
+
+/** Read a roaster's own homepage/about page and extract profile facts. */
+export async function enrichRoasterPage(url: string, apiKey: string, modelOverride?: string): Promise<RoasterEnrichResult> {
+  if (!apiKey) {
+    return { ok: false, message: "OpenRouter API key is not configured." };
+  }
+  const model = modelOverride || DEFAULT_MODEL;
+
+  const [text, meta] = await Promise.all([fetchPageText(url), fetchPageMeta(url)]);
+  if (!text) return { ok: false, message: "Could not read that page." };
+
+  const reply = await callOpenRouterChat(apiKey, model, [
+    {
+      role: "system",
+      content:
+        "You extract facts about a COFFEE ROASTER company from its own website " +
+        "page. Return ONLY a JSON object with these keys: roasterState " +
+        "(state/province they operate out of), roasterCountry, " +
+        "roasterDescription (a short blurb about who they are), " +
+        "roasterFoundedYear (a 4-digit year), roasterSpecialty (a short phrase " +
+        "on what they focus on, e.g. \"single-origin light roasts\"). Use null " +
+        "for anything the page does not say — do not guess.",
+    },
+    { role: "user", content: `Roaster page URL: ${url}\n\nPage text:\n${text}` },
+  ]);
+  if (!reply.ok) return reply;
+
+  const result = parseFieldsReply(reply.content, parseRoasterFields);
+  if (!result.ok) return result;
+  return { ok: true, fields: { ...result.fields, logoUrl: meta.image } };
 }
 
 /** Merge photo- and product-page-derived fields, preferring the (usually fuller) page facts. */

@@ -58,6 +58,14 @@ export default function LinkImportForm() {
   const [tastingNotes, setTastingNotes] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Roaster-level facts pulled off the same page, applied to a brand-new
+  // roaster row only (an existing roaster's profile is never touched here).
+  const [roasterState, setRoasterState] = useState("");
+  const [roasterCountry, setRoasterCountry] = useState("");
+  const [roasterDescription, setRoasterDescription] = useState("");
+  const [roasterFoundedYear, setRoasterFoundedYear] = useState("");
+  const [roasterSpecialty, setRoasterSpecialty] = useState("");
+
   async function lookUp() {
     const trimmed = url.trim();
     if (!trimmed) {
@@ -122,6 +130,11 @@ export default function LinkImportForm() {
     setDecaf(f.decaffeinated);
     setTastingNotes(f.tastingNotes ?? "");
     if (!notes) setNotes(f.description ?? "");
+    setRoasterState(res.roaster.state ?? "");
+    setRoasterCountry(res.roaster.country ?? "");
+    setRoasterDescription(res.roaster.description ?? "");
+    setRoasterFoundedYear(res.roaster.foundedYear != null ? String(res.roaster.foundedYear) : "");
+    setRoasterSpecialty(res.roaster.specialty ?? "");
     const filled: { label: string }[] = [];
     if (f.country) filled.push({ label: "Country" });
     if (f.region) filled.push({ label: "Region" });
@@ -155,6 +168,11 @@ export default function LinkImportForm() {
     setMix("");
     setDecaf(false);
     setTastingNotes("");
+    setRoasterState("");
+    setRoasterCountry("");
+    setRoasterDescription("");
+    setRoasterFoundedYear("");
+    setRoasterSpecialty("");
     setAiFilled(null);
     setAiUsed(false);
     setAiNote(null);
@@ -190,6 +208,11 @@ export default function LinkImportForm() {
           {state.message ? <div className="form-error">{state.message}</div> : null}
           <input type="hidden" name="url" value={url.trim()} />
           <input type="hidden" name="variantIndex" value={variantIndex} />
+          {roasterState ? <input type="hidden" name="roasterState" value={roasterState} /> : null}
+          {roasterCountry ? <input type="hidden" name="roasterCountry" value={roasterCountry} /> : null}
+          {roasterDescription ? <input type="hidden" name="roasterDescription" value={roasterDescription} /> : null}
+          {roasterFoundedYear ? <input type="hidden" name="roasterFoundedYear" value={roasterFoundedYear} /> : null}
+          {roasterSpecialty ? <input type="hidden" name="roasterSpecialty" value={roasterSpecialty} /> : null}
 
           {aiOnly ? (
             <p className="form-error" style={{ marginBottom: 14 }}>

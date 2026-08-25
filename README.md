@@ -64,6 +64,14 @@ run on your own machine or a homelab server; all data stays on your disk.
   lists every field found with a checkbox, defaulting to all selected; only
   what you leave checked gets written into the form (overwriting existing
   values), and nothing is saved until you submit the form yourself.
+- **Roasters** (`/roasters`) — a directory of every roaster you have bought
+  from, auto-created the first time a bag names them (no manual "add roaster"
+  step). Each has a name, logo, state/country, a short blurb, specialty and
+  founded year, plus the count and grid of bags from them. Edit a roaster the
+  same way you edit a bag, including "Update from a link" (paste the
+  roaster's homepage and AI merges in profile details, logo included).
+  Renaming a roaster updates every bag's `roaster` field to match. Deleting is
+  blocked while any bag still references it.
 - **Import** — Beanconqueror JSON export, Bean Vault JSON backup (photos
   included), or Bean Vault CSV.
 - **Export** — a JSON backup with every photo embedded (restores into Bean
@@ -215,7 +223,9 @@ rotated out of a store's current catalog genuinely have no product page left,
 so nothing is guessed — upload a photo manually for those.
 
 The roaster → store mapping lives in `src/lib/storefinder.ts`; extend it there
-if a roaster enables a feed.
+if a roaster enables a feed. This is a separate, still-hardcoded lookup for
+photo auto-find — unrelated to the `roasters` table (`/roasters`), which
+tracks roaster profiles, not store feeds.
 
 ## Data & backups
 
@@ -250,16 +260,21 @@ src/
       page.tsx               # collection: tiles + grid editing views
       [id]/                  # detail view (lifecycle, fields, notes)
       [id]/edit/             # edit a coffee
+    roasters/
+      page.tsx               # roaster directory
+      [id]/                  # detail view (profile + bags from them)
+      [id]/edit/             # edit a roaster
     settings/                # data export/import, AI key, API keys
     actions.ts               # server actions (create/update/delete/status/import/find)
     api/
       v1/coffees/            # REST API (list/create/update/delete)
+      v1/roasters/           # REST API (list/create/update/delete)
       photos/[name]/         # serves uploaded photos
       export/                # CSV export
       export/json/           # JSON backup (photos embedded)
   components/                # dashboard, collection, grid editor, forms, toggles
-  db/                        # schema + SQLite client (auto-migrates)
-  lib/                       # parsers, validation, photo + storefront lookup, AI
+  db/                        # schema (coffees + roasters) + SQLite client (auto-migrates)
+  lib/                       # parsers, validation, photo + storefront lookup, AI, roasters.ts (find-or-create)
 docker-compose.yml           # homelab compose config
 Dockerfile                   # multi-stage, standalone output (~90 MB)
 ```
@@ -299,6 +314,15 @@ above; the difference is the review dialog, which lets you pick exactly
 which found fields to apply (including overwriting fields that already have
 a value) rather than filling everything in automatically.
 
+When the store page also says something about the roaster itself (state,
+country, a short blurb, founded year, specialty), that gets read too — if the
+bag's roaster is brand new, its profile is filled in automatically alongside
+the coffee's own fields. An existing roaster's profile is never overwritten
+this way. On a roaster's own edit page, "Update from a link" re-reads a
+pasted URL (its homepage, not a product page) the same way "Update from
+product link" does for a coffee — merge-only, and it also fetches a logo if
+the roaster does not have one yet.
+
 The key can be managed from the app itself: **Settings** saves it in the
 local settings table — server-side only, never sent to the browser and never
 included in exports. Alternatively set `OPENROUTER_API_KEY` in `.env.local`
@@ -336,6 +360,11 @@ Missing or invalid keys get `401 {"error":"Unauthorized"}`.
 | `/api/v1/coffees/:id` | GET | — | Get one coffee |
 | `/api/v1/coffees/:id` | PATCH | fields to change | Merge-update; `null` clears a field |
 | `/api/v1/coffees/:id` | DELETE | — | Delete (also removes its photo file) |
+| `/api/v1/roasters` | GET | — | List all roasters (by name) |
+| `/api/v1/roasters` | POST | roaster fields | Create. `409` if the name already exists (case-insensitive) |
+| `/api/v1/roasters/:id` | GET | — | Get one roaster |
+| `/api/v1/roasters/:id` | PATCH | fields to change | Merge-update; renaming `name` also updates every coffee's `roaster` field to match |
+| `/api/v1/roasters/:id` | DELETE | — | Delete (also removes its logo). `409` while any coffee still references it |
 
 ### Examples
 
@@ -424,6 +453,7 @@ string clears a field on PATCH.
 | Key | Type | Notes |
 |---|---|---|
 | `id` | `integer` | URI id (`/api/v1/coffees/:id`). |
+| `roasterId` | `integer \| null` | Auto-linked to `/api/v1/roasters` by matching `roaster` (case-insensitive); a new roaster row is created if none matches. |
 | `origin` | `string \| null` | Always derived from `country` + `region`; never accepted directly. |
 | `status` | `string` | Bag lifecycle: `resting`, `frozen`, `opened`, or `empty`. Managed via the app, not the API. |
 | `openedAt` | `string \| null` | `YYYY-MM-DD` the bag was first opened. |
@@ -441,6 +471,7 @@ string clears a field on PATCH.
 {
   "id": 121,
   "roaster": "S&W Craft Roasting",
+  "roasterId": 4,
   "name": "Colombia Villa Betulia Natural Gesha King",
   "origin": "Colombia, Villa Betulia",
   "country": "Colombia",
@@ -471,6 +502,24 @@ string clears a field on PATCH.
   "updatedAt": "2026-08-15T09:00:00.000Z"
 }
 ```
+
+**Roaster fields** (`/api/v1/roasters`), same writable/read-only split as above:
+
+| Key | Type | Constraints / format |
+|---|---|---|
+| `name` | `string` | 1–200 chars. **Required on create**; cannot be emptied via PATCH; must be unique (case-insensitive). |
+| `website` | `string \| null` | ≤ 500 chars. |
+| `state` | `string \| null` | ≤ 100 chars. |
+| `country` | `string \| null` | ≤ 100 chars. |
+| `specialty` | `string \| null` | ≤ 200 chars. |
+| `description` | `string \| null` | ≤ 2000 chars. |
+| `foundedYear` | `integer \| null` | 1600–current year. |
+| `logoUrl` | `string \| null` | Write-only. POST: server downloads and stores the image. PATCH: replaces the logo; `null` or `""` removes it. Never returned. |
+| `id` | `integer` | Read-only. URI id (`/api/v1/roasters/:id`). |
+| `logoFile` | `string \| null` | Read-only. Stored logo filename; manage via `logoUrl`. |
+| `aiEnriched` | `boolean` | Read-only. Set when AI filled the profile. |
+| `sourceUrl` | `string \| null` | Read-only. Last URL used for AI enrichment. |
+| `createdAt` / `updatedAt` | `string` (ISO 8601) | Read-only, server-managed. |
 
 ### Errors
 

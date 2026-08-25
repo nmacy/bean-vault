@@ -14,6 +14,12 @@ export const LIMITS = {
   process: 80,
   notes: 4000,
   tastingNotes: 4000,
+  roasterName: 200,
+  roasterWebsite: 500,
+  roasterState: 100,
+  roasterCountry: 100,
+  roasterSpecialty: 200,
+  roasterDescription: 2000,
 };
 
 /** Trimmed string (capped at LIMITS[name]), or null when empty. */
