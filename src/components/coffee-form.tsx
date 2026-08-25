@@ -196,10 +196,6 @@ export default function CoffeeForm({ action, coffee, submitLabel, hasAiKey = fal
                 <label htmlFor="emptiedAt">Emptied date</label>
                 <input id="emptiedAt" name="emptiedAt" type="date" defaultValue={coffee.emptiedAt ?? ""} />
               </div>
-              <div className="field">
-                <label htmlFor="frozenDays">Frozen days <span className="hint">(total)</span></label>
-                <input id="frozenDays" name="frozenDays" type="number" min="0" inputMode="numeric" defaultValue={coffee.frozenDays ?? 0} />
-              </div>
             </>
           ) : null}
           <div className="field">

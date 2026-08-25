@@ -24,7 +24,6 @@ type Cell = {
   frozenAt: string;
   unfrozenAt: string;
   emptiedAt: string;
-  frozenDays: string;
   price: string;
   weight: string;
   rating: string;
@@ -54,7 +53,6 @@ const COLUMNS: { key: string; label: string }[] = [
   { key: "frozenAt", label: "Frozen" },
   { key: "unfrozenAt", label: "Unfrozen" },
   { key: "emptiedAt", label: "Emptied" },
-  { key: "frozenDays", label: "Frozen days" },
   { key: "price", label: "Price" },
   { key: "weight", label: "Weight (g)" },
   { key: "rating", label: "Rating" },
@@ -98,7 +96,6 @@ function toCell(row: GridRow): Cell {
     frozenAt: row.frozenAt ?? "",
     unfrozenAt: row.unfrozenAt ?? "",
     emptiedAt: row.emptiedAt ?? "",
-    frozenDays: String(row.frozenDays ?? 0),
     price: row.priceCents != null ? (row.priceCents / 100).toFixed(2) : "",
     weight: row.weightGrams != null ? String(row.weightGrams) : "",
     rating: row.rating != null ? String(row.rating) : "",
@@ -108,7 +105,6 @@ function toCell(row: GridRow): Cell {
 function toPayload(row: BaseRow, cell: Cell): GridRow {
   const price = cell.price.trim() === "" ? null : Math.round(Number(cell.price) * 100);
   const weight = cell.weight.trim() === "" ? null : Math.round(Number(cell.weight));
-  const frozenDays = cell.frozenDays.trim() === "" ? 0 : Math.round(Number(cell.frozenDays));
   return {
     id: row.id,
     roaster: cell.roaster.trim(),
@@ -127,7 +123,6 @@ function toPayload(row: BaseRow, cell: Cell): GridRow {
     frozenAt: cell.frozenAt || null,
     unfrozenAt: cell.unfrozenAt || null,
     emptiedAt: cell.emptiedAt || null,
-    frozenDays: Number.isFinite(frozenDays) && frozenDays > 0 ? frozenDays : 0,
     priceCents: price !== null && Number.isFinite(price) ? price : null,
     weightGrams: weight !== null && Number.isFinite(weight) && weight > 0 ? weight : null,
     rating: cell.rating ? Number(cell.rating) : null,
@@ -167,18 +162,6 @@ function formatWeight(raw: string): string {
   if (!t) return "";
   const n = Math.round(Number(t));
   if (!Number.isFinite(n) || n < 1 || n > 1_000_000) return t;
-  return String(n);
-}
-
-function sanitizeCount(raw: string): string {
-  return raw.replace(/\D/g, "").slice(0, 7);
-}
-
-function formatCount(raw: string): string {
-  const t = raw.trim();
-  if (!t) return "0";
-  const n = Math.round(Number(t));
-  if (!Number.isFinite(n) || n < 0 || n > 1_000_000) return t;
   return String(n);
 }
 
@@ -320,7 +303,6 @@ export default function GridEditor({
     let fixed = raw;
     if (field === "price") fixed = formatPrice(sanitizePrice(raw));
     else if (field === "weight") fixed = formatWeight(sanitizeWeight(raw));
-    else if (field === "frozenDays") fixed = formatCount(sanitizeCount(raw));
     else if (TEXT_FIELDS.includes(field)) fixed = raw.trim();
 
     if (fixed !== raw) setCell(id, field, fixed);
@@ -519,12 +501,6 @@ export default function GridEditor({
         return <td><input type="date" value={cellValue(row.id, "unfrozenAt")} onChange={(e) => setCell(row.id, "unfrozenAt", e.target.value)} onBlur={() => handleBlur(row.id, "unfrozenAt")} /></td>;
       case "emptiedAt":
         return <td><input type="date" value={cellValue(row.id, "emptiedAt")} onChange={(e) => setCell(row.id, "emptiedAt", e.target.value)} onBlur={() => handleBlur(row.id, "emptiedAt")} /></td>;
-      case "frozenDays":
-        return (
-          <td className="num">
-            <input inputMode="numeric" value={cellValue(row.id, "frozenDays")} placeholder="0" onChange={(e) => setCell(row.id, "frozenDays", sanitizeCount(e.target.value))} onBlur={() => handleBlur(row.id, "frozenDays")} />
-          </td>
-        );
       case "price":
         return (
           <td className="num">
@@ -584,7 +560,6 @@ function renderReadCell(row: BaseRow, key: string) {
       case "frozenAt": return text(row.frozenAt ?? "");
       case "unfrozenAt": return text(row.unfrozenAt ?? "");
       case "emptiedAt": return text(row.emptiedAt ?? "");
-      case "frozenDays": return <td className="num">{row.frozenDays > 0 ? `${row.frozenDays} d` : <span className="cell-none">—</span>}</td>;
       case "price": return <td className="num">{row.priceCents != null ? formatCents(row.priceCents) : <span className="cell-none">—</span>}</td>;
       case "weight": return <td className="num">{row.weightGrams != null ? `${row.weightGrams} g` : <span className="cell-none">—</span>}</td>;
       case "rating": return <td>{row.rating != null ? <span className="stars">{"★".repeat(row.rating)}</span> : <span className="cell-none">—</span>}</td>;

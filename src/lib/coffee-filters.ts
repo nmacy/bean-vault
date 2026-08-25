@@ -26,7 +26,6 @@ export type SortKey =
   | "frozenAt"
   | "unfrozenAt"
   | "emptiedAt"
-  | "frozenDays"
   | "price"
   | "weight"
   | "rating"
@@ -35,7 +34,7 @@ export type SortKey =
 export const SORT_KEYS: readonly SortKey[] = [
   "roaster", "name", "country", "region", "variety", "producer", "elevation",
   "process", "mix", "roastLevel", "roastDate", "purchaseDate", "status",
-  "openedAt", "frozenAt", "unfrozenAt", "emptiedAt", "frozenDays", "price",
+  "openedAt", "frozenAt", "unfrozenAt", "emptiedAt", "price",
   "weight", "rating", "decaf",
 ];
 
@@ -82,7 +81,6 @@ export type FilterableCoffee = {
   frozenAt: string | null;
   unfrozenAt: string | null;
   emptiedAt: string | null;
-  frozenDays: number;
   priceCents: number | null;
   weightGrams: number | null;
   rating: number | null;

@@ -49,7 +49,7 @@ export default async function CoffeeDetailPage({ params }: { params: Promise<{ i
             openedAt={coffee.openedAt}
             emptiedAt={coffee.emptiedAt}
             frozenAt={coffee.frozenAt}
-            frozenDays={coffee.frozenDays}
+            unfrozenAt={coffee.unfrozenAt}
           />
 
           <dl className="fields">

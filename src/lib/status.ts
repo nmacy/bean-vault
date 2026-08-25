@@ -70,37 +70,28 @@ export type BagDates = {
   openedAt: string | null;
   emptiedAt: string | null;
   frozenAt: string | null;
-  frozenDays: number;
+  unfrozenAt: string | null;
   /** Injectable for tests. Defaults to today. */
   today?: string;
 };
 
 /**
- * `frozenDays` is meant to already include the most recent completed freeze
- * (frozenAt → unfrozenAt) — that's what setCoffeeStatus's fold-on-unfreeze
- * does. But frozenAt/unfrozenAt/frozenDays are also directly editable (the
- * edit form's raw lifecycle fields), which can complete a freeze span
- * without anyone updating frozenDays to match.
- *
- * If this edit is what changed the span (frozenAt or unfrozenAt differs
- * from what's stored) and the submitted frozenDays is otherwise identical
- * to what's stored (so nobody typed a deliberate override), fold the new
- * span in automatically. Otherwise trust the submitted value — but never
- * below what frozenAt/unfrozenAt themselves prove happened; frozenDays is
- * cumulative, so it can't be less than the one span the dates show.
+ * Days spent frozen, assuming a bag is only ever frozen once. There's no
+ * running "cumulative frozen days" counter to keep in sync — the span comes
+ * straight from frozenAt/unfrozenAt (or frozenAt→today while still frozen).
+ * A re-freeze after an unfreeze would overwrite frozenAt/unfrozenAt and lose
+ * the earlier span; deliberately out of scope under that assumption.
  */
-export function reconcileFrozenDays(
-  existing: { frozenAt: string | null; unfrozenAt: string | null; frozenDays: number },
-  input: { frozenAt: string | null; unfrozenAt: string | null; frozenDays: number },
-): number {
-  if (!input.frozenAt || !input.unfrozenAt) return input.frozenDays;
-  const span = Math.max(0, dayDiff(input.frozenAt, input.unfrozenAt));
-  const spanChanged = input.frozenAt !== existing.frozenAt || input.unfrozenAt !== existing.unfrozenAt;
-  const frozenDaysUntouched = input.frozenDays === existing.frozenDays;
-  if (spanChanged && frozenDaysUntouched) {
-    return input.frozenDays + span;
-  }
-  return Math.max(input.frozenDays, span);
+function frozenSpanDays({
+  status,
+  frozenAt,
+  unfrozenAt,
+  today,
+}: Pick<BagDates, "status" | "frozenAt" | "unfrozenAt"> & { today: string }): number {
+  if (!frozenAt) return 0;
+  if (unfrozenAt) return Math.max(0, dayDiff(frozenAt, unfrozenAt));
+  if (status === "frozen") return Math.max(0, dayDiff(frozenAt, today));
+  return 0;
 }
 
 /**
@@ -112,7 +103,7 @@ export function restingDays({
   roastDate,
   status,
   frozenAt,
-  frozenDays,
+  unfrozenAt,
   emptiedAt,
   today = todayStr(),
 }: BagDates): number | null {
@@ -120,8 +111,7 @@ export function restingDays({
   const end = emptiedAt ?? today;
   const total = dayDiff(roastDate, end);
   if (total <= 0) return 0;
-  const activeFreeze = status === "frozen" && frozenAt ? Math.max(0, dayDiff(frozenAt, end)) : 0;
-  return Math.max(0, total - frozenDays - activeFreeze);
+  return Math.max(0, total - frozenSpanDays({ status, frozenAt, unfrozenAt, today: end }));
 }
 
 /**

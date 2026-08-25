@@ -18,7 +18,7 @@ type Props = {
   openedAt: string | null;
   emptiedAt: string | null;
   frozenAt: string | null;
-  frozenDays: number;
+  unfrozenAt: string | null;
 };
 
 
@@ -29,14 +29,14 @@ export default function StatusToggle({
   openedAt,
   emptiedAt,
   frozenAt,
-  frozenDays,
+  unfrozenAt,
 }: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const resting = useMemo(
-    () => restingDays({ roastDate, status, frozenAt, frozenDays, emptiedAt, openedAt }),
-    [roastDate, status, frozenAt, frozenDays, emptiedAt, openedAt],
+    () => restingDays({ roastDate, status, frozenAt, unfrozenAt, emptiedAt, openedAt }),
+    [roastDate, status, frozenAt, unfrozenAt, emptiedAt, openedAt],
   );
   const opened = useMemo(
     () => (openedAt ? openedDays({ openedAt, emptiedAt }) : null),
