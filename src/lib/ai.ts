@@ -179,10 +179,37 @@ function findTastingNotes(text: string): string | null {
   return s.length >= 12 ? s : null;
 }
 
-/** Page metadata for feed-less stores: og:title (or <title>) and og:image. */
+/** Every <link rel="\u2026icon\u2026"> tag on the page, resolved to absolute URLs. */
+function extractIconLinks(html: string, baseUrl: string): { rel: string; href: string }[] {
+  const icons: { rel: string; href: string }[] = [];
+  for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
+    const tag = m[0];
+    const rel = tag.match(/\brel=["']([^"']+)["']/i)?.[1]?.toLowerCase();
+    const href = tag.match(/\bhref=["']([^"']+)["']/i)?.[1];
+    if (!rel || !href || !rel.includes("icon")) continue;
+    try {
+      icons.push({ rel, href: new URL(href, baseUrl).toString() });
+    } catch {
+      /* malformed href, skip */
+    }
+  }
+  return icons;
+}
+
+/**
+ * The site's own icon, best quality first. apple-touch-icon is usually a
+ * clean square logo mark (vs. a tiny favicon.ico) \u2014 a much better "roaster
+ * logo" guess than a product photo when nothing better is available.
+ */
+function pickBestIcon(icons: { rel: string; href: string }[]): string | null {
+  const byRel = (want: string) => icons.find((i) => i.rel.includes(want))?.href ?? null;
+  return byRel("apple-touch-icon") ?? byRel("icon") ?? byRel("shortcut icon") ?? null;
+}
+
+/** Page metadata for feed-less stores: og:title (or <title>), og:image, and the site's own icon. */
 export async function fetchPageMeta(
   url: string,
-): Promise<{ title: string | null; image: string | null }> {
+): Promise<{ title: string | null; image: string | null; icon: string | null }> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), PAGE_FETCH_TIMEOUT_MS);
   try {
@@ -190,7 +217,7 @@ export async function fetchPageMeta(
       headers: { "User-Agent": "coffee-tracker/0.1 (personal coffee log)" },
       signal: ctrl.signal,
     });
-    if (!res.ok) return { title: null, image: null };
+    if (!res.ok) return { title: null, image: null, icon: null };
     const html = await res.text();
     const meta = (name: string) => {
       const m = html.match(
@@ -205,9 +232,9 @@ export async function fetchPageMeta(
       title = parts[0].trim();
       if (!title) title = null;
     }
-    return { title, image: meta("og:image") };
+    return { title, image: meta("og:image"), icon: pickBestIcon(extractIconLinks(html, url)) };
   } catch {
-    return { title: null, image: null };
+    return { title: null, image: null, icon: null };
   } finally {
     clearTimeout(timer);
   }
@@ -561,7 +588,7 @@ export async function enrichRoasterPage(url: string, apiKey: string, modelOverri
 
   const result = parseFieldsReply(reply.content, parseRoasterFields);
   if (!result.ok) return result;
-  return { ok: true, fields: { ...result.fields, logoUrl: meta.image } };
+  return { ok: true, fields: { ...result.fields, logoUrl: meta.icon ?? meta.image } };
 }
 
 /** Merge photo- and product-page-derived fields, preferring the (usually fuller) page facts. */

@@ -545,28 +545,47 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
     .returning();
 
   // Fill the newly-created roaster's profile from the same page the AI just
-  // read, when the link-import flow ran AI and had something to say. Never
-  // touches a roaster that already existed.
+  // read, when the link-import flow ran AI and had something to say — plus a
+  // logo, which needs no AI key at all (the site's own icon/apple-touch-icon
+  // is scraped straight off the page, a better "roaster logo" guess than the
+  // product photo). Never touches a roaster that already existed.
   if (roasterCreated) {
     const roasterState = text(formData, "roasterState");
     const roasterCountry = text(formData, "roasterCountry");
     const roasterDescription = text(formData, "roasterDescription");
     const roasterFoundedYear = intField(formData, "roasterFoundedYear", 1600, 2100);
     const roasterSpecialty = text(formData, "roasterSpecialty");
-    if (roasterState || roasterCountry || roasterDescription || roasterFoundedYear || roasterSpecialty) {
-      await db
-        .update(roasters)
-        .set({
-          state: roasterState,
-          country: roasterCountry,
-          description: roasterDescription,
-          foundedYear: roasterFoundedYear,
-          specialty: roasterSpecialty,
-          aiEnriched: true,
-          sourceUrl: url,
-          updatedAt: new Date(),
-        })
-        .where(eq(roasters.id, roasterId));
+    const hasAiFields = Boolean(
+      roasterState || roasterCountry || roasterDescription || roasterFoundedYear || roasterSpecialty,
+    );
+
+    const roasterMeta = await fetchPageMeta(url);
+    const roasterLogoUrl = roasterMeta.icon ?? roasterMeta.image;
+    let roasterLogoFile: string | null = null;
+    if (roasterLogoUrl) {
+      const image = await downloadRemoteImage(roasterLogoUrl);
+      if (image) {
+        try {
+          roasterLogoFile = await savePhotoBytes(image.data, image.ext);
+        } catch {
+          roasterLogoFile = null;
+        }
+      }
+    }
+
+    if (hasAiFields || roasterLogoFile) {
+      const roasterChanges: Partial<typeof roasters.$inferInsert> = { updatedAt: new Date() };
+      if (roasterState) roasterChanges.state = roasterState;
+      if (roasterCountry) roasterChanges.country = roasterCountry;
+      if (roasterDescription) roasterChanges.description = roasterDescription;
+      if (roasterFoundedYear) roasterChanges.foundedYear = roasterFoundedYear;
+      if (roasterSpecialty) roasterChanges.specialty = roasterSpecialty;
+      if (roasterLogoFile) roasterChanges.logoFile = roasterLogoFile;
+      if (hasAiFields) {
+        roasterChanges.aiEnriched = true;
+        roasterChanges.sourceUrl = url;
+      }
+      await db.update(roasters).set(roasterChanges).where(eq(roasters.id, roasterId));
     }
   }
 
