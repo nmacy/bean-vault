@@ -1311,6 +1311,15 @@ export async function updateRoasterFromLink(_prev: RoasterLinkUpdateState, formD
     applied.push("Specialty");
   }
 
+  if (!roaster.website) {
+    try {
+      changes.website = new URL(url).origin;
+      applied.push("Website");
+    } catch {
+      /* not a valid absolute URL, skip */
+    }
+  }
+
   if (!roaster.logoFile && f.logoUrl) {
     const image = await downloadRemoteImage(f.logoUrl);
     if (image) {

@@ -322,8 +322,9 @@ bag's roaster is brand new, its profile is filled in automatically alongside
 the coffee's own fields. An existing roaster's profile is never overwritten
 this way. On a roaster's own edit page, "Update from a link" re-reads a
 pasted URL (its homepage, not a product page) the same way "Update from
-product link" does for a coffee — merge-only, and it also fetches a logo if
-the roaster does not have one yet.
+product link" does for a coffee — merge-only, and it also fetches a logo and
+sets the website field (to the link's own domain) if the roaster does not
+have one yet.
 
 The key can be managed from the app itself: **Settings** saves it in the
 local settings table — server-side only, never sent to the browser and never
