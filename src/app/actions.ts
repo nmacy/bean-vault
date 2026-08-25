@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { coffees, roasters, settings } from "@/db/schema";
-import { deletePhoto, downloadRemoteImage, savePhoto, savePhotoBytes } from "@/lib/photos";
+import { deletePhoto, downloadFirstWorkingImage, downloadRemoteImage, savePhoto, savePhotoBytes } from "@/lib/photos";
 import { dateField, dollarsToCents, elevationField, intField, photoFile as readPhoto, requiredText, text } from "@/lib/validation";
 import { parseBeanconqueror } from "@/lib/beanconqueror";
 import { bestMatch, lookupProductPage, storeFor, storeProducts, type StoreProductDetail } from "@/lib/storefinder";
@@ -560,10 +560,12 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
     );
 
     const roasterMeta = await fetchPageMeta(url);
-    const roasterLogoUrl = roasterMeta.icon ?? roasterMeta.image;
+    const roasterLogoCandidates = [...roasterMeta.icons, roasterMeta.image].filter(
+      (u): u is string => u !== null,
+    );
     let roasterLogoFile: string | null = null;
-    if (roasterLogoUrl) {
-      const image = await downloadRemoteImage(roasterLogoUrl);
+    if (roasterLogoCandidates.length > 0) {
+      const image = await downloadFirstWorkingImage(roasterLogoCandidates);
       if (image) {
         try {
           roasterLogoFile = await savePhotoBytes(image.data, image.ext);
@@ -1320,8 +1322,8 @@ export async function updateRoasterFromLink(_prev: RoasterLinkUpdateState, formD
     }
   }
 
-  if (!roaster.logoFile && f.logoUrl) {
-    const image = await downloadRemoteImage(f.logoUrl);
+  if (!roaster.logoFile && f.logoCandidates.length > 0) {
+    const image = await downloadFirstWorkingImage(f.logoCandidates);
     if (image) {
       try {
         changes.logoFile = await savePhotoBytes(image.data, image.ext);

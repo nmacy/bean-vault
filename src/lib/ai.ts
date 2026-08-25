@@ -179,16 +179,42 @@ function findTastingNotes(text: string): string | null {
   return s.length >= 12 ? s : null;
 }
 
-/** Every <link rel="\u2026icon\u2026"> tag on the page, resolved to absolute URLs. */
-function extractIconLinks(html: string, baseUrl: string): { rel: string; href: string }[] {
-  const icons: { rel: string; href: string }[] = [];
+/**
+ * Many storefront CDNs (Shopify's in particular) resize an image on the fly
+ * via width/height query params \u2014 a favicon <link> often points at a tiny
+ * 32x32 crop of an otherwise crisp, much larger master image. Stripping
+ * those params serves the original file instead.
+ */
+function fullResolutionIcon(url: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete("width");
+    u.searchParams.delete("height");
+    u.searchParams.delete("crop");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+/** Every <link rel="\u2026icon\u2026"> tag on the page, resolved to absolute, full-resolution URLs. */
+function extractIconLinks(html: string, baseUrl: string): { href: string; isAppleTouch: boolean; area: number }[] {
+  const icons: { href: string; isAppleTouch: boolean; area: number }[] = [];
   for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
     const tag = m[0];
     const rel = tag.match(/\brel=["']([^"']+)["']/i)?.[1]?.toLowerCase();
     const href = tag.match(/\bhref=["']([^"']+)["']/i)?.[1];
-    if (!rel || !href || !rel.includes("icon")) continue;
+    if (!rel || !href) continue;
+    const tokens = rel.split(/\s+/);
+    if (!tokens.some((t) => t.includes("icon"))) continue;
+    const sizes = tag.match(/\bsizes=["']([^"']+)["']/i)?.[1]?.match(/(\d+)x(\d+)/i);
+    const area = sizes ? Number(sizes[1]) * Number(sizes[2]) : 0;
     try {
-      icons.push({ rel, href: new URL(href, baseUrl).toString() });
+      icons.push({
+        href: fullResolutionIcon(new URL(href, baseUrl).toString()),
+        isAppleTouch: tokens.some((t) => t.startsWith("apple-touch-icon")),
+        area,
+      });
     } catch {
       /* malformed href, skip */
     }
@@ -197,19 +223,23 @@ function extractIconLinks(html: string, baseUrl: string): { rel: string; href: s
 }
 
 /**
- * The site's own icon, best quality first. apple-touch-icon is usually a
- * clean square logo mark (vs. a tiny favicon.ico) \u2014 a much better "roaster
- * logo" guess than a product photo when nothing better is available.
+ * Every icon candidate on the page, best quality first: apple-touch-icon
+ * (usually a clean square logo mark, unlike a tiny favicon.ico) before plain
+ * favicons, largest declared `sizes` first within each group. Ranked (rather
+ * than a single pick) so a broken/404 link \u2014 theme cruft is common \u2014 can be
+ * skipped in favor of the next-best candidate instead of losing the logo.
  */
-function pickBestIcon(icons: { rel: string; href: string }[]): string | null {
-  const byRel = (want: string) => icons.find((i) => i.rel.includes(want))?.href ?? null;
-  return byRel("apple-touch-icon") ?? byRel("icon") ?? byRel("shortcut icon") ?? null;
+function rankIcons(icons: { href: string; isAppleTouch: boolean; area: number }[]): string[] {
+  const sorted = [...icons].sort((a, b) =>
+    a.isAppleTouch !== b.isAppleTouch ? (a.isAppleTouch ? -1 : 1) : b.area - a.area,
+  );
+  return [...new Set(sorted.map((i) => i.href))];
 }
 
-/** Page metadata for feed-less stores: og:title (or <title>), og:image, and the site's own icon. */
+/** Page metadata for feed-less stores: og:title (or <title>), og:image, and ranked icon candidates. */
 export async function fetchPageMeta(
   url: string,
-): Promise<{ title: string | null; image: string | null; icon: string | null }> {
+): Promise<{ title: string | null; image: string | null; icon: string | null; icons: string[] }> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), PAGE_FETCH_TIMEOUT_MS);
   try {
@@ -217,7 +247,7 @@ export async function fetchPageMeta(
       headers: { "User-Agent": "coffee-tracker/0.1 (personal coffee log)" },
       signal: ctrl.signal,
     });
-    if (!res.ok) return { title: null, image: null, icon: null };
+    if (!res.ok) return { title: null, image: null, icon: null, icons: [] };
     const html = await res.text();
     const meta = (name: string) => {
       const m = html.match(
@@ -232,9 +262,10 @@ export async function fetchPageMeta(
       title = parts[0].trim();
       if (!title) title = null;
     }
-    return { title, image: meta("og:image"), icon: pickBestIcon(extractIconLinks(html, url)) };
+    const icons = rankIcons(extractIconLinks(html, url));
+    return { title, image: meta("og:image"), icon: icons[0] ?? null, icons };
   } catch {
-    return { title: null, image: null, icon: null };
+    return { title: null, image: null, icon: null, icons: [] };
   } finally {
     clearTimeout(timer);
   }
@@ -557,7 +588,7 @@ export async function analyzeCoffeePhoto(
 }
 
 export type RoasterEnrichResult =
-  | { ok: true; fields: AiRoasterFields & { logoUrl: string | null } }
+  | { ok: true; fields: AiRoasterFields & { logoCandidates: string[] } }
   | { ok: false; message: string };
 
 /** Read a roaster's own homepage/about page and extract profile facts. */
@@ -588,7 +619,8 @@ export async function enrichRoasterPage(url: string, apiKey: string, modelOverri
 
   const result = parseFieldsReply(reply.content, parseRoasterFields);
   if (!result.ok) return result;
-  return { ok: true, fields: { ...result.fields, logoUrl: meta.icon ?? meta.image } };
+  const logoCandidates = [...meta.icons, meta.image].filter((u): u is string => u !== null);
+  return { ok: true, fields: { ...result.fields, logoCandidates } };
 }
 
 /** Merge photo- and product-page-derived fields, preferring the (usually fuller) page facts. */
