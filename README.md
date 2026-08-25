@@ -66,12 +66,14 @@ run on your own machine or a homelab server; all data stays on your disk.
   values), and nothing is saved until you submit the form yourself.
 - **Roasters** (`/roasters`) — a directory of every roaster you have bought
   from, auto-created the first time a bag names them (no manual "add roaster"
-  step). Each has a name, logo, state/country, a short blurb, specialty and
-  founded year, plus the count and grid of bags from them. Edit a roaster the
-  same way you edit a bag, including "Update from a link" (paste the
-  roaster's homepage and AI merges in profile details, logo included).
-  Renaming a roaster updates every bag's `roaster` field to match. Deleting is
-  blocked while any bag still references it.
+  step) — including bags added before this feature existed, which are
+  backfilled into their own bare roaster row automatically on startup. Each
+  has a name, logo, state/country, a short blurb, specialty and founded year,
+  plus the count and grid of bags from them. Edit a roaster the same way you
+  edit a bag, including "Update from a link" (paste the roaster's homepage
+  and AI merges in profile details, logo included). Renaming a roaster
+  updates every bag's `roaster` field to match. Deleting is blocked while any
+  bag still references it.
 - **Import** — Beanconqueror JSON export, Bean Vault JSON backup (photos
   included), or Bean Vault CSV.
 - **Export** — a JSON backup with every photo embedded (restores into Bean

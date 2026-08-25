@@ -45,9 +45,43 @@ function runMigrationsOnce() {
   }
   try {
     migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });
+    backfillRoasterIds();
   } finally {
     rmSync(LOCK_DIR, { recursive: true, force: true });
   }
+}
+
+/**
+ * Populate roasters/coffees.roaster_id for bags that predate the roasters
+ * table (or were written by a path that hadn't been wired up yet). Idempotent
+ * and cheap when there is nothing to do; raw sync SQL to match the rest of
+ * this module's synchronous, no-top-level-await startup style.
+ */
+function backfillRoasterIds() {
+  const missing = sqlite
+    .prepare(`select distinct roaster from coffees where roaster_id is null`)
+    .all() as { roaster: string }[];
+  if (missing.length === 0) return;
+
+  const insertRoaster = sqlite.prepare(
+    `insert into roasters (name, created_at, updated_at) values (?, ?, ?) on conflict(name) do nothing`,
+  );
+  const findRoasterId = sqlite.prepare(`select id from roasters where lower(name) = lower(?)`);
+  const linkCoffees = sqlite.prepare(
+    `update coffees set roaster_id = ? where roaster_id is null and lower(roaster) = lower(?)`,
+  );
+
+  const run = sqlite.transaction((names: string[]) => {
+    const now = Math.floor(Date.now() / 1000);
+    for (const raw of names) {
+      const name = raw.trim();
+      if (!name) continue;
+      insertRoaster.run(name, now, now);
+      const row = findRoasterId.get(name) as { id: number } | undefined;
+      if (row) linkCoffees.run(row.id, name);
+    }
+  });
+  run(missing.map((r) => r.roaster));
 }
 
 runMigrationsOnce();
