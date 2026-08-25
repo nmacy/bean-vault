@@ -33,13 +33,15 @@ export default function RoastersView({ roasters }: { roasters: RoasterItem[] }) 
         <h1>Roasters ({filtered.length})</h1>
       </div>
 
-      <input
-        className="filter-search"
-        type="text"
-        placeholder="Search roasters…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+      <div className="grid-toolbar">
+        <input
+          className="filter-search"
+          type="text"
+          placeholder="Search roasters…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
 
       {filtered.length === 0 ? (
         <div className="empty">
