@@ -12,6 +12,7 @@ export default async function RoastersPage() {
       id: roasters.id,
       name: roasters.name,
       website: roasters.website,
+      city: roasters.city,
       state: roasters.state,
       country: roasters.country,
       description: roasters.description,

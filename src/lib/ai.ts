@@ -29,6 +29,7 @@ export type AiCoffeeFields = {
 
 /** Roaster-level facts opportunistically pulled off a product page, if present. */
 export type AiRoasterFields = {
+  city: string | null;
   state: string | null;
   country: string | null;
   description: string | null;
@@ -427,6 +428,7 @@ function parseRoasterFields(data: unknown): AiRoasterFields {
   const yearRaw = cleanString(rec.roasterFoundedYear);
   const year = yearRaw ? Number(yearRaw.replace(/[^\d]/g, "")) : null;
   return {
+    city: cleanString(rec.roasterCity),
     state: cleanString(rec.roasterState),
     country: cleanString(rec.roasterCountry),
     description: cleanString(rec.roasterDescription),
@@ -562,7 +564,8 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
         "jasmine and a syrupy body\"; null when the page has none), description. " +
         "Also, if the page (e.g. a footer, about section, or brand story) says " +
         "anything about the ROASTER itself (the company, not this specific bag), " +
-        "include: roasterState (state/province they operate out of), " +
+        "include: roasterCity (city they operate out of), roasterState " +
+        "(state/province they operate out of), " +
         "roasterCountry, roasterDescription (a short blurb about the roaster), " +
         "roasterFoundedYear (a 4-digit year), roasterSpecialty (a short phrase " +
         "on what they focus on, e.g. \"single-origin light roasts\"). " +
@@ -590,7 +593,7 @@ export async function enrichCoffeePage(url: string, apiKey: string, modelOverrid
     fields,
     roaster: roasterResult.ok
       ? roasterResult.fields
-      : { state: null, country: null, description: null, foundedYear: null, specialty: null },
+      : { city: null, state: null, country: null, description: null, foundedYear: null, specialty: null },
   };
 }
 
@@ -671,7 +674,8 @@ export async function enrichRoasterPage(url: string, apiKey: string, modelOverri
       role: "system",
       content:
         "You extract facts about a COFFEE ROASTER company from its own website " +
-        "page. Return ONLY a JSON object with these keys: roasterState " +
+        "page. Return ONLY a JSON object with these keys: roasterCity " +
+        "(city they operate out of), roasterState " +
         "(state/province they operate out of), roasterCountry, " +
         "roasterDescription (a short blurb about who they are), " +
         "roasterFoundedYear (a 4-digit year), roasterSpecialty (a short phrase " +

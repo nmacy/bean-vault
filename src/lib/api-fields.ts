@@ -163,6 +163,7 @@ export function mapCoffeeFields(
 export type RoasterFieldValues = Partial<{
   name: string;
   website: string | null;
+  city: string | null;
   state: string | null;
   country: string | null;
   description: string | null;
@@ -204,11 +205,13 @@ export function mapRoasterFields(
   }
 
   const website = str("website", LIMITS.roasterWebsite);
+  const city = str("city", LIMITS.roasterCity);
   const state = str("state", LIMITS.roasterState);
   const country = str("country", LIMITS.roasterCountry);
   const description = str("description", LIMITS.roasterDescription);
   const specialty = str("specialty", LIMITS.roasterSpecialty);
   if (website !== undefined) values.website = website;
+  if (city !== undefined) values.city = city;
   if (state !== undefined) values.state = state;
   if (country !== undefined) values.country = country;
   if (description !== undefined) values.description = description;

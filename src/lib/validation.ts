@@ -16,6 +16,7 @@ export const LIMITS = {
   tastingNotes: 4000,
   roasterName: 200,
   roasterWebsite: 500,
+  roasterCity: 100,
   roasterState: 100,
   roasterCountry: 100,
   roasterSpecialty: 200,

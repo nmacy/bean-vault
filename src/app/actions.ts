@@ -556,13 +556,14 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
   // is scraped straight off the page, a better "roaster logo" guess than the
   // product photo). Never touches a roaster that already existed.
   if (roasterCreated) {
+    const roasterCity = text(formData, "roasterCity");
     const roasterState = text(formData, "roasterState");
     const roasterCountry = text(formData, "roasterCountry");
     const roasterDescription = text(formData, "roasterDescription");
     const roasterFoundedYear = intField(formData, "roasterFoundedYear", 1600, 2100);
     const roasterSpecialty = text(formData, "roasterSpecialty");
     const hasAiFields = Boolean(
-      roasterState || roasterCountry || roasterDescription || roasterFoundedYear || roasterSpecialty,
+      roasterCity || roasterState || roasterCountry || roasterDescription || roasterFoundedYear || roasterSpecialty,
     );
 
     const roasterMeta = await fetchPageMeta(url);
@@ -583,6 +584,7 @@ export async function createCoffeeFromLink(_prev: FormState, formData: FormData)
 
     if (hasAiFields || roasterLogoFile) {
       const roasterChanges: Partial<typeof roasters.$inferInsert> = { updatedAt: new Date() };
+      if (roasterCity) roasterChanges.city = roasterCity;
       if (roasterState) roasterChanges.state = roasterState;
       if (roasterCountry) roasterChanges.country = roasterCountry;
       if (roasterDescription) roasterChanges.description = roasterDescription;
@@ -609,6 +611,7 @@ const ALLOWED_PHOTO_EXTS = new Set(["jpg", "jpeg", "png", "webp", "gif", "avif"]
 type BackupRoaster = {
   name?: unknown;
   website?: unknown;
+  city?: unknown;
   state?: unknown;
   country?: unknown;
   description?: unknown;
@@ -724,6 +727,7 @@ export async function importBackup(_prev: ImportState, formData: FormData): Prom
 
       const values = {
         website: backupStr(r.website),
+        city: backupStr(r.city),
         state: backupStr(r.state),
         country: backupStr(r.country),
         description: backupStr(r.description),
@@ -1284,6 +1288,7 @@ function collectRoaster(form: FormData) {
   return {
     name: requiredText(form, "roasterName"),
     website: text(form, "roasterWebsite"),
+    city: text(form, "roasterCity"),
     state: text(form, "roasterState"),
     country: text(form, "roasterCountry"),
     specialty: text(form, "roasterSpecialty"),
@@ -1315,6 +1320,7 @@ export async function updateRoaster(id: number, _prev: RoasterFormState, formDat
     .set({
       name: input.name,
       website: input.website,
+      city: input.city,
       state: input.state,
       country: input.country,
       specialty: input.specialty,
@@ -1372,6 +1378,10 @@ export async function updateRoasterFromLink(_prev: RoasterLinkUpdateState, formD
   const applied: string[] = [];
   const changes: Partial<typeof roasters.$inferInsert> = { updatedAt: new Date() };
 
+  if (f.city && f.city !== roaster.city) {
+    changes.city = f.city;
+    applied.push("City");
+  }
   if (f.state && f.state !== roaster.state) {
     changes.state = f.state;
     applied.push("State");
