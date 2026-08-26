@@ -68,7 +68,7 @@ run on your own machine or a homelab server; all data stays on your disk.
   from, auto-created the first time a bag names them (no manual "add roaster"
   step) — including bags added before this feature existed, which are
   backfilled into their own bare roaster row automatically on startup. Each
-  has a name, logo, state/country, a short blurb, specialty and founded year,
+  has a name, logo, city/state/country, a short blurb, specialty and founded year,
   plus the count and grid of bags from them. Edit a roaster the same way you
   edit a bag, including "Update from a link" (paste the roaster's homepage
   and AI merges in profile details, logo included). Renaming a roaster
@@ -319,7 +319,7 @@ above; the difference is the review dialog, which lets you pick exactly
 which found fields to apply (including overwriting fields that already have
 a value) rather than filling everything in automatically.
 
-When the store page also says something about the roaster itself (state,
+When the store page also says something about the roaster itself (city, state,
 country, a short blurb, founded year, specialty), that gets read too — if the
 bag's roaster is brand new, its profile is filled in automatically alongside
 the coffee's own fields. An existing roaster's profile is never overwritten
@@ -515,6 +515,7 @@ string clears a field on PATCH.
 |---|---|---|
 | `name` | `string` | 1–200 chars. **Required on create**; cannot be emptied via PATCH; must be unique (case-insensitive). |
 | `website` | `string \| null` | ≤ 500 chars. |
+| `city` | `string \| null` | ≤ 100 chars. |
 | `state` | `string \| null` | ≤ 100 chars. |
 | `country` | `string \| null` | ≤ 100 chars. |
 | `specialty` | `string \| null` | ≤ 200 chars. |

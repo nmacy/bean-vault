@@ -8,6 +8,7 @@ export type RoasterItem = {
   id: number;
   name: string;
   website: string | null;
+  city: string | null;
   state: string | null;
   country: string | null;
   description: string | null;
@@ -63,8 +64,8 @@ export default function RoastersView({ roasters }: { roasters: RoasterItem[] }) 
                 </div>
                 <div className="card-body">
                   <h3>{r.name}</h3>
-                  {r.state || r.country ? (
-                    <div className="roaster">{[r.state, r.country].filter(Boolean).join(", ")}</div>
+                  {r.city || r.state || r.country ? (
+                    <div className="roaster">{[r.city, r.state, r.country].filter(Boolean).join(", ")}</div>
                   ) : null}
                   {r.description ? <p className="roaster-blurb">{r.description}</p> : null}
                   <div className="tags">

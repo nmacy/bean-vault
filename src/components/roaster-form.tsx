@@ -31,6 +31,10 @@ export default function RoasterForm({ action, roaster, submitLabel }: Props) {
             <input id="roasterWebsite" name="roasterWebsite" type="url" defaultValue={roaster?.website ?? ""} placeholder="https://…" maxLength={500} />
           </div>
           <div className="field">
+            <label htmlFor="roasterCity">City</label>
+            <input id="roasterCity" name="roasterCity" defaultValue={roaster?.city ?? ""} placeholder="e.g. Springdale" maxLength={100} />
+          </div>
+          <div className="field">
             <label htmlFor="roasterState">State</label>
             <input id="roasterState" name="roasterState" defaultValue={roaster?.state ?? ""} placeholder="e.g. Arkansas" maxLength={100} />
           </div>

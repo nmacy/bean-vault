@@ -39,8 +39,8 @@ export default async function RoasterDetailPage({ params }: { params: Promise<{ 
         </div>
         <div>
           <h1>{roaster.name}</h1>
-          {roaster.state || roaster.country ? (
-            <p className="roaster">{[roaster.state, roaster.country].filter(Boolean).join(", ")}</p>
+          {roaster.city || roaster.state || roaster.country ? (
+            <p className="roaster">{[roaster.city, roaster.state, roaster.country].filter(Boolean).join(", ")}</p>
           ) : null}
 
           <dl className="fields">

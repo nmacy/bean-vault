@@ -4,6 +4,7 @@ export const roasters = sqliteTable("roasters", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
   website: text("website"),
+  city: text("city"),
   state: text("state"), // state/province they operate out of
   country: text("country"),
   description: text("description"), // short blurb

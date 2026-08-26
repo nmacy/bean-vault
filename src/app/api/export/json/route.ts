@@ -29,6 +29,7 @@ export async function GET() {
       id: r.id,
       name: r.name,
       website: r.website,
+      city: r.city,
       state: r.state,
       country: r.country,
       description: r.description,

@@ -1,0 +1,1 @@
+ALTER TABLE `roasters` ADD `city` text;
