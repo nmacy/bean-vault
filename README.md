@@ -326,9 +326,12 @@ country, a short blurb, founded year, specialty), that gets read too — if the
 bag's roaster is brand new, its profile is filled in automatically alongside
 the coffee's own fields. An existing roaster's profile is never overwritten
 this way. On a roaster's own edit page, once it has a website on file,
-"Scan website with AI" re-reads that page (its homepage, not a product page)
-the same way "Update from product link" does for a coffee — merge-only, and
-it also fetches a logo if the roaster does not have one yet.
+"Scan website with AI" re-reads its homepage (not a product page) — merge-only,
+and it also fetches a logo if the roaster does not have one yet. It also
+crawls a handful of same-site pages likely to carry details the homepage
+doesn't, matched by wording rather than fixed slugs (About, Locations,
+History, Contact, FAQ, and similar), since a street address in particular is
+often only on a dedicated "Store Location"/"Visit Us" page.
 
 The key can be managed from the app itself: **Settings** saves it in the
 local settings table — server-side only, never sent to the browser and never

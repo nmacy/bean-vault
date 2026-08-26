@@ -82,7 +82,7 @@ function htmlToText(html: string): string {
   return content.slice(0, MAX_PAGE_CHARS);
 }
 
-export async function fetchPageText(url: string): Promise<string | null> {
+async function fetchHtml(url: string): Promise<string | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), PAGE_FETCH_TIMEOUT_MS);
   try {
@@ -90,13 +90,97 @@ export async function fetchPageText(url: string): Promise<string | null> {
       headers: { "User-Agent": "coffee-tracker/0.1 (personal coffee log)" },
       signal: ctrl.signal,
     });
-    if (!res.ok) return null;
-    return htmlToText(await res.text());
+    return res.ok ? await res.text() : null;
   } catch {
     return null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function fetchPageText(url: string): Promise<string | null> {
+  const html = await fetchHtml(url);
+  return html !== null ? htmlToText(html) : null;
+}
+
+/** Same-site links out of a page, with their visible link text. */
+function extractInternalLinks(html: string, baseUrl: string): { url: string; label: string }[] {
+  const base = new URL(baseUrl);
+  const out: { url: string; label: string }[] = [];
+  const seen = new Set<string>();
+  for (const m of html.matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const href = m[1].trim();
+    if (!href || /^(mailto|tel|javascript):/i.test(href)) continue;
+    let abs: URL;
+    try {
+      abs = new URL(href, base);
+    } catch {
+      continue;
+    }
+    if (abs.hostname !== base.hostname) continue;
+    abs.hash = "";
+    const key = abs.toString();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const label = decodeEntities(m[2].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+    out.push({ url: key, label });
+  }
+  return out;
+}
+
+/**
+ * Pages most likely to carry roaster profile facts that don't live on the
+ * homepage — a street address in particular is often only on a dedicated
+ * "Store Location"/"Visit Us" page. Matches by keyword in either the URL
+ * path or the link's visible text, so it isn't tied to specific page slugs.
+ */
+const PROFILE_SUBPAGE_KEYWORDS = [
+  "about", "our-story", "story", "history",
+  "location", "visit", "roastery", "cafe", "café",
+  "contact", "faq",
+];
+const MAX_PROFILE_SUBPAGES = 6;
+
+function pickProfileSubpageUrls(links: { url: string; label: string }[], homeUrl: string): string[] {
+  const seen = new Set([homeUrl]);
+  const picked: string[] = [];
+  for (const { url, label } of links) {
+    if (seen.has(url) || picked.length >= MAX_PROFILE_SUBPAGES) continue;
+    const haystack = `${url} ${label}`.toLowerCase();
+    if (!PROFILE_SUBPAGE_KEYWORDS.some((k) => haystack.includes(k))) continue;
+    seen.add(url);
+    picked.push(url);
+  }
+  return picked;
+}
+
+const MAX_SUBPAGE_CHARS = 6_000;
+const MAX_PROFILE_TOTAL_CHARS = 45_000;
+
+/**
+ * Homepage text plus a handful of same-site pages likely to hold roaster
+ * profile facts the homepage doesn't (About, Locations, History, Contact,
+ * FAQ, or anything else linked with matching wording) — best-effort, pages
+ * that fail to fetch are just left out.
+ */
+async function fetchRoasterProfileText(url: string): Promise<string | null> {
+  const homeHtml = await fetchHtml(url);
+  if (homeHtml === null) return null;
+
+  const homeUrl = new URL(url).toString();
+  const subpageUrls = pickProfileSubpageUrls(extractInternalLinks(homeHtml, url), homeUrl);
+  const subpages = await Promise.all(
+    subpageUrls.map(async (subUrl) => {
+      const html = await fetchHtml(subUrl);
+      return html !== null ? { url: subUrl, text: htmlToText(html).slice(0, MAX_SUBPAGE_CHARS) } : null;
+    }),
+  );
+
+  const blocks = [`--- Home page (${homeUrl}) ---\n${htmlToText(homeHtml).slice(0, MAX_SUBPAGE_CHARS)}`];
+  for (const page of subpages) {
+    if (page) blocks.push(`--- ${page.url} ---\n${page.text}`);
+  }
+  return blocks.join("\n\n").slice(0, MAX_PROFILE_TOTAL_CHARS);
 }
 
 /** Pull the first JSON of a text (tolerates fences, prose, trailing garbage). */
@@ -306,35 +390,23 @@ function rankLogoCandidates(html: string, baseUrl: string): string[] {
 export async function fetchPageMeta(
   url: string,
 ): Promise<{ title: string | null; image: string | null; icon: string | null; icons: string[] }> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), PAGE_FETCH_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "coffee-tracker/0.1 (personal coffee log)" },
-      signal: ctrl.signal,
-    });
-    if (!res.ok) return { title: null, image: null, icon: null, icons: [] };
-    const html = await res.text();
-    const meta = (name: string) => {
-      const m = html.match(
-        new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)`, "i"),
-      );
-      return m ? m[1].replace(/&amp;/g, "&").trim() : null;
-    };
-    let title = meta("og:title") ?? html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ?? null;
-    if (title) {
-      // Drop trailing brand bits: "Colombia Villa Betulia | S&W Craft Roasting"
-      const parts = title.split(/\s[|\u2014\u2013\u2012-]\s/);
-      title = parts[0].trim();
-      if (!title) title = null;
-    }
-    const icons = rankLogoCandidates(html, url);
-    return { title, image: meta("og:image"), icon: icons[0] ?? null, icons };
-  } catch {
-    return { title: null, image: null, icon: null, icons: [] };
-  } finally {
-    clearTimeout(timer);
+  const html = await fetchHtml(url);
+  if (html === null) return { title: null, image: null, icon: null, icons: [] };
+  const meta = (name: string) => {
+    const m = html.match(
+      new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)`, "i"),
+    );
+    return m ? m[1].replace(/&amp;/g, "&").trim() : null;
+  };
+  let title = meta("og:title") ?? html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ?? null;
+  if (title) {
+    // Drop trailing brand bits: "Colombia Villa Betulia | S&W Craft Roasting"
+    const parts = title.split(/\s[|\u2014\u2013\u2012-]\s/);
+    title = parts[0].trim();
+    if (!title) title = null;
   }
+  const icons = rankLogoCandidates(html, url);
+  return { title, image: meta("og:image"), icon: icons[0] ?? null, icons };
 }
 
 /** "1,900–2,100 masl" (or ft) -> unit-less meters: "1,900–2,100". */
@@ -666,23 +738,27 @@ export async function enrichRoasterPage(url: string, apiKey: string, modelOverri
   }
   const model = modelOverride || DEFAULT_MODEL;
 
-  const [text, meta] = await Promise.all([fetchPageText(url), fetchPageMeta(url)]);
+  const [text, meta] = await Promise.all([fetchRoasterProfileText(url), fetchPageMeta(url)]);
   if (!text) return { ok: false, message: "Could not read that page." };
 
   const reply = await callOpenRouterChat(apiKey, model, [
     {
       role: "system",
       content:
-        "You extract facts about a COFFEE ROASTER company from its own website " +
-        "page. Return ONLY a JSON object with these keys: roasterCity " +
-        "(city they operate out of), roasterState " +
-        "(state/province they operate out of), roasterCountry, " +
-        "roasterDescription (a short blurb about who they are), " +
-        "roasterFoundedYear (a 4-digit year), roasterSpecialty (a short phrase " +
-        "on what they focus on, e.g. \"single-origin light roasts\"). Use null " +
-        "for anything the page does not say — do not guess.",
+        "You extract facts about a COFFEE ROASTER company from its own " +
+        "website. The text below may include several pages from the site " +
+        "(home, About, Locations, Contact, FAQ, etc.), each marked with a " +
+        "--- url --- header — read all of them, since details like a street " +
+        "address are often only on a dedicated locations/contact/visit page " +
+        "rather than the homepage. Return ONLY a JSON object with these keys: " +
+        "roasterCity (city they operate out of, or their flagship/HQ location " +
+        "if they have several), roasterState (state/province they operate " +
+        "out of), roasterCountry, roasterDescription (a short blurb about who " +
+        "they are), roasterFoundedYear (a 4-digit year), roasterSpecialty (a " +
+        "short phrase on what they focus on, e.g. \"single-origin light " +
+        "roasts\"). Use null for anything none of the pages say — do not guess.",
     },
-    { role: "user", content: `Roaster page URL: ${url}\n\nPage text:\n${text}` },
+    { role: "user", content: `Roaster site: ${url}\n\n${text}` },
   ]);
   if (!reply.ok) return reply;
 
