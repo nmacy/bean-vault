@@ -70,8 +70,10 @@ run on your own machine or a homelab server; all data stays on your disk.
   backfilled into their own bare roaster row automatically on startup. Each
   has a name, logo, city/state/country, a short blurb, specialty and founded year,
   plus the count and grid of bags from them. Edit a roaster the same way you
-  edit a bag, including "Update from a link" (paste the roaster's homepage
-  and AI merges in profile details, logo included). Renaming a roaster
+  edit a bag; when it already has a website on file, a "Scan website with AI"
+  button re-reads that page and merges in profile details (logo included) —
+  it appears once a website is saved, and disappears again if you clear that
+  field. Renaming a roaster
   updates every bag's `roaster` field to match. Deleting is blocked while any
   bag still references it — and the reverse happens automatically too: if
   deleting a bag or moving it to a different roaster leaves a roaster with no
@@ -323,11 +325,10 @@ When the store page also says something about the roaster itself (city, state,
 country, a short blurb, founded year, specialty), that gets read too — if the
 bag's roaster is brand new, its profile is filled in automatically alongside
 the coffee's own fields. An existing roaster's profile is never overwritten
-this way. On a roaster's own edit page, "Update from a link" re-reads a
-pasted URL (its homepage, not a product page) the same way "Update from
-product link" does for a coffee — merge-only, and it also fetches a logo and
-sets the website field (to the link's own domain) if the roaster does not
-have one yet.
+this way. On a roaster's own edit page, once it has a website on file,
+"Scan website with AI" re-reads that page (its homepage, not a product page)
+the same way "Update from product link" does for a coffee — merge-only, and
+it also fetches a logo if the roaster does not have one yet.
 
 The key can be managed from the app itself: **Settings** saves it in the
 local settings table — server-side only, never sent to the browser and never

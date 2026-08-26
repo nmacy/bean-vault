@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { roasters } from "@/db/schema";
 import RoasterForm from "@/components/roaster-form";
-import UpdateRoasterFromLink from "@/components/update-roaster-from-link";
+import ScanRoasterWebsite from "@/components/scan-roaster-website";
 import DeleteRoasterButton from "@/components/delete-roaster-button";
 import { countRoasterCoffees } from "@/lib/roasters";
 import { updateRoaster } from "@/app/actions";
@@ -27,7 +27,7 @@ export default async function EditRoasterPage({ params }: { params: Promise<{ id
       <div className="page-head">
         <h1>Edit roaster</h1>
       </div>
-      <UpdateRoasterFromLink id={roaster.id} />
+      <ScanRoasterWebsite id={roaster.id} website={roaster.website} />
       <RoasterForm action={updateRoaster.bind(null, roaster.id)} roaster={roaster} submitLabel="Save changes" />
       <section className="form-card danger-zone">
         <h2 className="link-heading">Delete this roaster</h2>

@@ -1353,23 +1353,24 @@ export async function deleteRoaster(id: number): Promise<void> {
   redirect("/roasters");
 }
 
-/* ---------- update existing roaster from a link ---------- */
+/* ---------- scan a roaster's own website with AI ---------- */
 
 export type RoasterLinkUpdateState = { message?: string; applied?: string[]; ok?: boolean };
 
 /**
- * Re-read a roaster's own page (homepage/about, not a product page) and merge
- * AI-extracted profile facts into an existing roaster. Only fills fields the
- * page actually provides, and never replaces an existing logo.
+ * Re-read a roaster's own website (its `website` field, not a product page)
+ * and merge AI-extracted profile facts into it. Only fills fields the page
+ * actually provides, and never replaces an existing logo. Requires the
+ * roaster to already have a website on file.
  */
-export async function updateRoasterFromLink(_prev: RoasterLinkUpdateState, formData: FormData): Promise<RoasterLinkUpdateState> {
+export async function scanRoasterWebsite(_prev: RoasterLinkUpdateState, formData: FormData): Promise<RoasterLinkUpdateState> {
   const id = intField(formData, "id", 1, 1_000_000_000);
-  const url = text(formData, "url");
   if (id === null) return { message: "Missing roaster id." };
-  if (!url) return { message: "Paste a link first." };
 
   const [roaster] = await db.select().from(roasters).where(eq(roasters.id, id));
   if (!roaster) return { message: "Roaster not found." };
+  const url = roaster.website;
+  if (!url) return { message: "Add a website first." };
 
   const enriched = await enrichRoasterPage(url, await resolveAiKey(), await resolveAiModel());
   if (!enriched.ok) return { ok: false, message: enriched.message };
@@ -1401,15 +1402,6 @@ export async function updateRoasterFromLink(_prev: RoasterLinkUpdateState, formD
   if (f.specialty && f.specialty !== roaster.specialty) {
     changes.specialty = f.specialty;
     applied.push("Specialty");
-  }
-
-  if (!roaster.website) {
-    try {
-      changes.website = new URL(url).origin;
-      applied.push("Website");
-    } catch {
-      /* not a valid absolute URL, skip */
-    }
   }
 
   if (!roaster.logoFile && f.logoCandidates.length > 0) {
